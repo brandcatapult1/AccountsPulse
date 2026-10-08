@@ -59,6 +59,11 @@ export const POST = route(async ({ req, user }) => {
     const id = rows[0].id;
     for (const [n, it] of (ex.items || []).entries()) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,details,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, n + 1, it.description, it.details || '', it.hsn, it.qty ?? 1, it.rate ?? 0, it.amount ?? 0]);
     await linkParty(c, direction, fromId, toId);
+    const ownId = direction === 'sales' ? fromId : toId;
+    if (ex.bank?.account_no && direction === 'sales' && ownId) {
+      const cur = (await c.query('SELECT bank_accounts FROM companies WHERE id=$1', [ownId])).rows[0]?.bank_accounts || [];
+      if (!cur.some((b) => b.account_no === ex.bank.account_no)) await c.query('UPDATE companies SET bank_accounts=$1 WHERE id=$2', [JSON.stringify([...cur, { holder: ex.bank.holder, bank: ex.bank.bank, account_no: ex.bank.account_no, ifsc: ex.bank.ifsc, branch: ex.bank.branch, upi_id: '' }]), ownId]);
+    }
     await audit(c, user, 'invoice.upload', 'invoice', id, { file: file.name, docType });
     return { id, invoice_no: ex.invoiceNo, doc_type: docType, flags: ex.flags || [], total: ex.total, currency: cur };
   });

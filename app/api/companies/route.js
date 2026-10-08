@@ -1,6 +1,6 @@
 import { route, bad, audit } from '@/lib/api';
 import { q, tx } from '@/lib/db';
-import { cleanContacts, saveSellers } from '@/lib/companies';
+import { cleanContacts, cleanBanks, saveSellers } from '@/lib/companies';
 
 export const GET = route(async ({ req }) => {
   const u = new URL(req.url).searchParams;
@@ -21,8 +21,8 @@ export const POST = route(async ({ req, user }) => {
   if (!b.name?.trim()) bad('Legal name is required.');
   return tx(async (c) => {
     const { rows } = await c.query(
-      `INSERT INTO companies (name,brand_name,kind,gstin,pan,tax_id,address,state,contacts,currency,credit_days,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [b.name.trim(), b.brand_name?.trim() || null, b.kind || 'client', b.gstin?.trim().toUpperCase() || null, b.pan?.trim().toUpperCase() || null, b.tax_id || null, b.address || null, b.state || null, JSON.stringify(cleanContacts(b.contacts)), (b.currency || 'INR').toUpperCase(), +b.credit_days || 0, user.id]);
+      `INSERT INTO companies (name,brand_name,kind,gstin,pan,tax_id,address,state,contacts,currency,credit_days,created_by,bank_accounts) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [b.name.trim(), b.brand_name?.trim() || null, b.kind || 'client', b.gstin?.trim().toUpperCase() || null, b.pan?.trim().toUpperCase() || null, b.tax_id || null, b.address || null, b.state || null, JSON.stringify(cleanContacts(b.contacts)), (b.currency || 'INR').toUpperCase(), +b.credit_days || 0, user.id, JSON.stringify(cleanBanks(b.bank_accounts))]);
     await saveSellers(c, rows[0].id, rows[0].kind, b.seller_ids);
     await audit(c, user, 'company.create', 'company', rows[0].id, { name: b.name, kind: rows[0].kind });
     return rows[0];

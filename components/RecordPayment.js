@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { api, inr2, num, fdate } from '@/lib/client';
+import { api, useApi, inr2, num, fdate } from '@/lib/client';
 
 const MODES = ['Bank account', 'UPI', 'Cash', 'Cheque'];
 export default function RecordPayment({ inv, onClose, onDone, title }) {
@@ -10,6 +10,9 @@ export default function RecordPayment({ inv, onClose, onDone, title }) {
   const [d, setD] = useState({ account: '', reference: '', upi_id: '', txn_id: '', received_by: '', receipt_no: '', cheque_no: '', bank: '', cheque_date: '', status: 'Deposited' });
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const foreign = inv.currency !== 'INR';
+  const { data: owns } = useApi('/companies?kind=own&all=1');
+  const accounts = ((owns || []).find((o) => o.id === inv.seller_id)?.bank_accounts || []).filter((b) => b.account_no || b.bank);
+  const accLabel = (b) => `${b.bank || 'Bank'} ••${String(b.account_no || '').slice(-4)}${b.holder ? ' · ' + b.holder : ''}`;
   const det = { 'Bank account': { account: d.account, reference: d.reference }, UPI: { upi_id: d.upi_id, txn_id: d.txn_id }, Cash: { received_by: d.received_by, receipt_no: d.receipt_no }, Cheque: { cheque_no: d.cheque_no, bank: d.bank, cheque_date: d.cheque_date, status: d.status } }[mode];
   async function save() {
     setBusy(true); setErr('');
@@ -27,7 +30,9 @@ export default function RecordPayment({ inv, onClose, onDone, title }) {
     </div>
     <div className="lbl">How was it received?</div>
     <div className="modes">{MODES.map((m) => <button key={m} type="button" className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{m}</button>)}</div>
-    {mode === 'Bank account' && <div className="frow"><div className="fld"><label htmlFor="ba">Received in</label><input id="ba" placeholder="HDFC Current ••5933" value={d.account} onChange={D('account')} /></div><div className="fld"><label htmlFor="br">UTR / reference</label><input id="br" value={d.reference} onChange={D('reference')} /></div></div>}
+    {mode === 'Bank account' && <div className="frow"><div className="fld"><label htmlFor="ba">{inv.direction === 'purchase' ? 'Paid from' : 'Received in'}</label>
+      {accounts.length > 0 && <select id="bas" value={accounts.some((b) => accLabel(b) === d.account) ? d.account : ''} onChange={(e) => setD({ ...d, account: e.target.value })}><option value="">Other / type below</option>{accounts.map((b, i) => <option key={i} value={accLabel(b)}>{accLabel(b)}</option>)}</select>}
+      <input id="ba" placeholder="Bank account" value={d.account} onChange={D('account')} /></div><div className="fld"><label htmlFor="br">UTR / reference</label><input id="br" value={d.reference} onChange={D('reference')} /></div></div>}
     {mode === 'UPI' && <div className="frow"><div className="fld"><label htmlFor="ui">UPI ID / app</label><input id="ui" value={d.upi_id} onChange={D('upi_id')} /></div><div className="fld"><label htmlFor="ut">Transaction ID</label><input id="ut" value={d.txn_id} onChange={D('txn_id')} /></div></div>}
     {mode === 'Cash' && <div className="frow"><div className="fld"><label htmlFor="cb">Received by</label><input id="cb" value={d.received_by} onChange={D('received_by')} /></div><div className="fld"><label htmlFor="cr">Receipt no.</label><input id="cr" value={d.receipt_no} onChange={D('receipt_no')} /></div></div>}
     {mode === 'Cheque' && <div className="frow"><div className="fld"><label htmlFor="qn">Cheque no.</label><input id="qn" value={d.cheque_no} onChange={D('cheque_no')} /></div><div className="fld"><label htmlFor="qb">Bank & branch</label><input id="qb" value={d.bank} onChange={D('bank')} /></div><div className="fld"><label htmlFor="qd">Cheque date</label><input id="qd" type="date" value={d.cheque_date} onChange={D('cheque_date')} /></div>

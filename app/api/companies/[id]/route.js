@@ -1,14 +1,14 @@
 import { route, bad, audit } from '@/lib/api';
 import { tx } from '@/lib/db';
-import { cleanContacts, saveSellers } from '@/lib/companies';
+import { cleanContacts, cleanBanks, saveSellers } from '@/lib/companies';
 
 export const PUT = route(async ({ req, user, params }) => {
   const b = await req.json(); const id = +params.id;
   if (!b.name?.trim()) bad('Legal name is required.');
   return tx(async (c) => {
     const { rows } = await c.query(
-      `UPDATE companies SET name=$1,kind=$2,gstin=$3,pan=$4,tax_id=$5,address=$6,state=$7,contacts=$8,currency=$9,credit_days=$10,brand_name=$11 WHERE id=$12 RETURNING *`,
-      [b.name.trim(), b.kind || 'client', b.gstin?.trim().toUpperCase() || null, b.pan?.trim().toUpperCase() || null, b.tax_id || null, b.address || null, b.state || null, JSON.stringify(cleanContacts(b.contacts)), (b.currency || 'INR').toUpperCase(), +b.credit_days || 0, b.brand_name?.trim() || null, id]);
+      `UPDATE companies SET name=$1,kind=$2,gstin=$3,pan=$4,tax_id=$5,address=$6,state=$7,contacts=$8,currency=$9,credit_days=$10,brand_name=$11,bank_accounts=$13 WHERE id=$12 RETURNING *`,
+      [b.name.trim(), b.kind || 'client', b.gstin?.trim().toUpperCase() || null, b.pan?.trim().toUpperCase() || null, b.tax_id || null, b.address || null, b.state || null, JSON.stringify(cleanContacts(b.contacts)), (b.currency || 'INR').toUpperCase(), +b.credit_days || 0, b.brand_name?.trim() || null, id, JSON.stringify(cleanBanks(b.bank_accounts))]);
     if (!rows[0]) bad('Company not found.', 404);
     await saveSellers(c, id, rows[0].kind, b.seller_ids);
     await audit(c, user, 'company.update', 'company', id, { name: b.name });

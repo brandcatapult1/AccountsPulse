@@ -4,7 +4,7 @@ import { api, useApi, inr } from '@/lib/client';
 
 const KIND = { own: 'Seller', client: 'Client', vendor: 'Vendor' };
 const PILL = { own: 'p-acc', client: 'p-good', vendor: 'p-warn' };
-const blank = (kind) => ({ name: '', brand_name: '', kind, gstin: '', pan: '', tax_id: '', address: '', state: '', currency: 'INR', credit_days: 0, contacts: [{ name: '', phone: '', email: '' }], seller_ids: [] });
+const blank = (kind) => ({ name: '', brand_name: '', kind, gstin: '', pan: '', tax_id: '', address: '', state: '', currency: 'INR', credit_days: 0, contacts: [{ name: '', phone: '', email: '' }], bank_accounts: [], seller_ids: [] });
 
 export default function Companies() {
   const [kind, setKind] = useState(''); const [s, setS] = useState('');
@@ -18,8 +18,9 @@ export default function Companies() {
   async function del(c) { try { const r = await api('/companies/' + c.id, { method: 'DELETE' }); setMsg(r.archived ? `${c.name} has invoices, so it was archived.` : `${c.name} deleted.`); setErr(''); reload(); } catch (x) { setMsg(''); setErr(x.message); } }
   const S = (k) => (ev) => setE({ ...e, [k]: ev.target.value });
   const setPoc = (i, k, v) => setE({ ...e, contacts: e.contacts.map((p, j) => (j === i ? { ...p, [k]: v } : p)) });
+  const setBank = (i, k, v) => setE({ ...e, bank_accounts: e.bank_accounts.map((b, j) => (j === i ? { ...b, [k]: v } : b)) });
   const toggleSeller = (id) => setE({ ...e, seller_ids: e.seller_ids.includes(id) ? e.seller_ids.filter((x) => x !== id) : [...e.seller_ids, id] });
-  const edit = (c) => { setE({ ...blank(c.kind), ...c, brand_name: c.brand_name || '', gstin: c.gstin || '', pan: c.pan || '', tax_id: c.tax_id || '', address: c.address || '', state: c.state || '', contacts: c.contacts?.length ? c.contacts : [{ name: '', phone: '', email: '' }], seller_ids: (c.sellers || []).map((x) => x.id) }); setErr(''); setMsg(''); };
+  const edit = (c) => { setE({ ...blank(c.kind), ...c, brand_name: c.brand_name || '', gstin: c.gstin || '', pan: c.pan || '', tax_id: c.tax_id || '', address: c.address || '', state: c.state || '', contacts: c.contacts?.length ? c.contacts : [{ name: '', phone: '', email: '' }], bank_accounts: c.bank_accounts || [], seller_ids: (c.sellers || []).map((x) => x.id) }); setErr(''); setMsg(''); };
   const add = (k) => { setE({ ...blank(k), seller_ids: k === 'own' ? [] : (sellers || []).length === 1 ? [sellers[0].id] : [] }); setErr(''); setMsg(''); };
   return <>
     <div className="bar"><h2>Companies</h2>
@@ -30,7 +31,7 @@ export default function Companies() {
     <div className="split w">
       <div className="card scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Contacts</th><th>Seller(s)</th><th className="n">Balance</th><th /></tr></thead><tbody>
         {(data || []).map((c) => <tr key={c.id}>
-          <td><b>{c.name}</b>{c.brand_name && <span className="fx">{c.brand_name}</span>}<span className="fx">{c.gstin || c.tax_id || ''}</span></td>
+          <td><b>{c.name}</b>{c.brand_name && <span className="fx">{c.brand_name}</span>}<span className="fx">{c.gstin || c.tax_id || ''}</span>{(c.bank_accounts || []).length > 0 && <span className="fx">{c.bank_accounts.length} bank account{c.bank_accounts.length > 1 ? 's' : ''}: {c.bank_accounts.map((b) => `${b.bank || 'Bank'} ••${String(b.account_no || '').slice(-4)}`).join(', ')}</span>}</td>
           <td><span className={'pill ' + PILL[c.kind]}>{KIND[c.kind]}</span></td>
           <td>{(c.contacts || []).map((p, i) => <span key={i} className="fx" style={{ color: 'var(--ink)' }}>{p.name}{p.phone ? ' · ' + p.phone : ''}{p.email ? ' · ' + p.email : ''}</span>)}</td>
           <td>{c.kind === 'own' ? '—' : (c.sellers || []).map((x) => x.name).join(', ') || <span className="note">none</span>}</td>
@@ -48,6 +49,13 @@ export default function Companies() {
           <input className="inp" aria-label="POC email" type="email" placeholder="Email" value={p.email} onChange={(x) => setPoc(i, 'email', x.target.value)} />
           <button type="button" className="btn dng" aria-label="Remove contact" onClick={() => setE({ ...e, contacts: e.contacts.filter((_, j) => j !== i) })}>✕</button></div>)}
         <div><button type="button" className="btn" onClick={() => setE({ ...e, contacts: [...e.contacts, { name: '', phone: '', email: '' }] })}>+ Add another contact</button></div>
+        <div className="lbl">Bank accounts</div>
+        {e.bank_accounts.map((b, i) => <div key={i} className="card" style={{ background: 'var(--bg)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="frow"><input className="inp" aria-label="Account holder" placeholder="Account holder" value={b.holder || ''} onChange={(x) => setBank(i, 'holder', x.target.value)} /><input className="inp" aria-label="Bank name" placeholder="Bank name" value={b.bank || ''} onChange={(x) => setBank(i, 'bank', x.target.value)} /></div>
+          <div className="frow"><input className="inp" aria-label="Account number" placeholder="Account number" inputMode="numeric" value={b.account_no || ''} onChange={(x) => setBank(i, 'account_no', x.target.value)} /><input className="inp" aria-label="IFSC" placeholder="IFSC" value={b.ifsc || ''} onChange={(x) => setBank(i, 'ifsc', x.target.value)} /></div>
+          <div className="frow"><input className="inp" aria-label="Branch" placeholder="Branch" value={b.branch || ''} onChange={(x) => setBank(i, 'branch', x.target.value)} /><input className="inp" aria-label="UPI ID" placeholder="UPI ID (optional)" value={b.upi_id || ''} onChange={(x) => setBank(i, 'upi_id', x.target.value)} /></div>
+          <div style={{ textAlign: 'right' }}><button type="button" className="btn dng" onClick={() => setE({ ...e, bank_accounts: e.bank_accounts.filter((_, j) => j !== i) })}>Remove account</button></div></div>)}
+        <div><button type="button" className="btn" onClick={() => setE({ ...e, bank_accounts: [...e.bank_accounts, { holder: '', bank: '', account_no: '', ifsc: '', branch: '', upi_id: '' }] })}>+ Add bank account</button></div>
         {e.kind !== 'own' && <div className="fld"><label>Works with seller(s)</label>
           <div className="checks">{(sellers || []).map((x) => <label key={x.id}><input type="checkbox" checked={e.seller_ids.includes(x.id)} onChange={() => toggleSeller(x.id)} />{x.brand_name || x.name}</label>)}
             {!(sellers || []).length && <span className="note">Add a seller first (our own company).</span>}</div></div>}
