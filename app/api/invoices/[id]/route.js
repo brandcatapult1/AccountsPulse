@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { route, bad, audit } from '@/lib/api';
 import { q, tx } from '@/lib/db';
-import { loadInvoice } from '@/lib/invoices';
+import { loadInvoice, linkParty } from '@/lib/invoices';
 
 const r2 = (n) => Math.round(Number(n || 0) * 100) / 100;
 
@@ -38,6 +38,7 @@ export const PUT = route(async ({ req, user, params }) => {
        subtotal, r2(b.cgst), r2(b.sgst), r2(b.igst), total, r2(total * fx), b.linked_proforma_id || null, b.notes || null, id]);
     await c.query('DELETE FROM invoice_items WHERE invoice_id=$1', [id]);
     for (const i of items) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, i.sl, i.description, i.hsn, i.qty, i.rate, i.amount]);
+    await linkParty(c, b.direction, +b.from_company_id || null, +b.to_company_id || null);
     await audit(c, user, 'invoice.edit', 'invoice', id);
     return { ok: true };
   });

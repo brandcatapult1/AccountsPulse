@@ -13,7 +13,7 @@ function F({ label, id, flags, fields, children, hint }) {
 export default function Invoice() {
   const { id } = useParams(); const router = useRouter();
   const { data: inv, reload } = useApi('/invoices/' + id);
-  const { data: companies } = useApi('/companies');
+  const { data: companies } = useApi('/companies?all=1');
   const [f, setF] = useState(null); const [msg, setMsg] = useState(null); const [busy, setBusy] = useState(false); const [showPay, setShowPay] = useState(false);
   const [proformas, setProformas] = useState([]); const [confirmDel, setConfirmDel] = useState(false);
   useEffect(() => { if (inv) setF({ ...inv, invoice_date: iso(inv.invoice_date), due_date: iso(inv.due_date), fx_date: iso(inv.fx_date), items: inv.items.map((i) => ({ ...i })) }); }, [inv]);
@@ -40,6 +40,8 @@ export default function Invoice() {
   return <>
     <div className="bar"><h2>{inv.invoice_no || 'New invoice'} <TypeBadge t={inv.doc_type} /> <StageBadge s={inv.stage} status={inv.status} /></h2>
       <div className="filters"><button className="btn" onClick={() => router.back()}>◀ Back</button></div></div>
+    <p className="note">Added by <b>{inv.created_name || '—'}</b> on {fdate(inv.created_at)}
+      {inv.status === 'review' ? ' · Not reviewed yet' : <> · {inv.status === 'rejected' ? 'Rejected' : 'Reviewed'} by <b>{inv.reviewed_name || '—'}</b>{inv.reviewed_at ? ' on ' + fdate(inv.reviewed_at) : ''}</>}</p>
     {msg?.err && <div className="err-box">{msg.err}</div>}{msg?.ok && <div className="ok-box">{msg.ok}</div>}
     <div className="split">
       <div>

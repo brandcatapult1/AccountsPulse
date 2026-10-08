@@ -3,6 +3,7 @@ import path from 'node:path';
 import { route, bad, audit } from '@/lib/api';
 import { tx } from '@/lib/db';
 import { extractInvoice } from '@/lib/extract';
+import { linkParty } from '@/lib/invoices';
 
 export const runtime = 'nodejs';
 const DIR = () => path.resolve(process.env.UPLOAD_DIR || './storage/invoices');
@@ -36,6 +37,11 @@ export const POST = route(async ({ req, user }) => {
       ? [await findOrCreateCompany(c, ex.from, 'own', user), await findOrCreateCompany(c, ex.to, 'client', user)]
       : [await findOrCreateCompany(c, ex.from, 'vendor', user), await findOrCreateCompany(c, ex.to, 'own', user)];
     const fromId = +form.get('from_company_id') || fromC, toId = +form.get('to_company_id') || toC;
+    const chosen = +form.get('seller_id') || null; const sellerOnInvoice = direction === 'sales' ? fromId : toId;
+    if (chosen && sellerOnInvoice && chosen !== sellerOnInvoice) {
+      const nm = (await c.query('SELECT name FROM companies WHERE id IN ($1,$2)', [chosen, sellerOnInvoice])).rows;
+      (ex.flags ||= []).push({ field: 'parties', level: 'yellow', msg: `This invoice is for a different seller than the one selected in the sidebar (${nm.map((n) => n.name).join(' vs ')}). Check the From / To companies.` });
+    }
     if (ex.invoiceNo && fromId) {
       const d = await c.query(`SELECT i.id, u.name FROM invoices i LEFT JOIN users u ON u.id=i.created_by WHERE i.from_company_id=$1 AND i.invoice_no=$2 AND i.doc_type=$3 AND i.status<>'rejected'`, [fromId, ex.invoiceNo, docType]);
       if (d.rows[0]) bad(`Duplicate: ${ex.invoiceNo} is already uploaded${d.rows[0].name ? ' by ' + d.rows[0].name : ''}.`, 409);
@@ -52,6 +58,7 @@ export const POST = route(async ({ req, user }) => {
        file.name, stored, MIME[ext], JSON.stringify({ ...ex, rawText: undefined }), JSON.stringify(ex.flags || []), user.id]);
     const id = rows[0].id;
     for (const [n, it] of (ex.items || []).entries()) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, n + 1, it.description, it.hsn, it.qty ?? 1, it.rate ?? 0, it.amount ?? 0]);
+    await linkParty(c, direction, fromId, toId);
     await audit(c, user, 'invoice.upload', 'invoice', id, { file: file.name, docType });
     return { id, invoice_no: ex.invoiceNo, doc_type: docType, flags: ex.flags || [], total: ex.total, currency: cur };
   });

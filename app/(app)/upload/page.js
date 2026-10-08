@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import Link from 'next/link';
-import { api, useApi, inr2, TypeBadge } from '@/lib/client';
+import { api, useApi, inr2, TypeBadge, getSeller } from '@/lib/client';
 import { Seg } from '@/components/Filters';
 
 export default function Upload() {
@@ -10,7 +10,7 @@ export default function Upload() {
   async function send(files) {
     for (const file of files) {
       const key = file.name + Math.random(); setRows((r) => [{ key, name: file.name, state: 'reading' }, ...r]);
-      const fd = new FormData(); fd.append('file', file); fd.append('direction', direction); if (docType !== 'auto') fd.append('doc_type', docType);
+      const fd = new FormData(); fd.append('file', file); fd.append('direction', direction); if (getSeller()) fd.append('seller_id', getSeller()); if (docType !== 'auto') fd.append('doc_type', docType);
       try { const res = await api('/invoices/upload', { method: 'POST', body: fd }); setRows((r) => r.map((x) => x.key === key ? { ...x, state: 'done', res } : x)); }
       catch (e) { setRows((r) => r.map((x) => x.key === key ? { ...x, state: 'fail', err: e.message } : x)); }
     }

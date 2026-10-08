@@ -19,11 +19,11 @@ export default function Invoices() {
       <OwnerSelect user={me} team={team} value={owner} onChange={setOwner} />
       <div className="fld"><label htmlFor="q">Search</label><input id="q" placeholder="no. or company" value={s} onChange={(e) => setS(e.target.value)} /></div>
     </div>
-    <div className="card scroll"><table><thead><tr><th>Invoice</th><th>Type</th><th>Company</th><th>Date</th><th className="n">Amount</th><th className="n">INR</th><th>Status</th></tr></thead><tbody>
+    <div className="card scroll"><table><thead><tr><th>Invoice</th><th>Type</th><th>Company</th><th>Date</th><th className="n">Amount</th><th className="n">INR</th><th>Status</th><th>Added by</th><th>Reviewed by</th></tr></thead><tbody>
       {(data || []).map((i) => <tr key={i.id} className="click" onClick={() => router.push('/invoice/' + i.id)}>
-        <td className="mono">{i.invoice_no || '—'}</td><td><TypeBadge t={i.doc_type} /></td><td>{i.party_name || '—'}{i.direction === 'purchase' && <span className="fx">purchase</span>}</td><td className="mono">{fdate(i.invoice_date)}</td>
-        <td className="n"><Money inv={i} /></td><td className="n">{inr(i.total_inr)}</td><td><StageBadge s={i.stage} status={i.status} /></td></tr>)}
-      {data && !data.length && <tr><td colSpan="7" className="note">No invoices match.</td></tr>}
+        <td className="mono">{i.invoice_no || '—'}</td><td><TypeBadge t={i.doc_type} /></td><td>{i.party_name || '—'}{i.party_brand && <span className="fx">{i.party_brand}</span>}{i.direction === 'purchase' && <span className="fx">purchase</span>}</td><td className="mono">{fdate(i.invoice_date)}</td>
+        <td className="n"><Money inv={i} /></td><td className="n">{inr(i.total_inr)}</td><td><StageBadge s={i.stage} status={i.status} /></td><td>{i.created_name || '—'}<span className="fx">{fdate(i.created_at)}</span></td><td>{i.reviewed_name || '—'}{i.reviewed_at && <span className="fx">{fdate(i.reviewed_at)}</span>}</td></tr>)}
+      {data && !data.length && <tr><td colSpan="9" className="note">No invoices match.</td></tr>}
     </tbody></table></div>
   </>;
 }

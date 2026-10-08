@@ -10,7 +10,7 @@ export const POST = route(async ({ req, user, params }) => {
     const p = await c.query('SELECT COUNT(*)::int n FROM payments WHERE invoice_id=$1 AND NOT voided', [id]);
     if (p.rows[0].n) bad('This invoice has payments. Void them first.', 409);
     await c.query('DELETE FROM ledger_entries WHERE invoice_id=$1', [id]);
-    await c.query(`UPDATE invoices SET status='review', approved_by=NULL, approved_at=NULL WHERE id=$1`, [id]);
+    await c.query(`UPDATE invoices SET status='review', approved_by=NULL, approved_at=NULL, reviewed_by=NULL, reviewed_at=NULL WHERE id=$1`, [id]);
     await audit(c, user, 'invoice.reopen', 'invoice', id, { reason });
     return { ok: true };
   });

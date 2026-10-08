@@ -1,22 +1,24 @@
 import { route } from '@/lib/api';
 import { q } from '@/lib/db';
 import { visibleIds } from '@/lib/auth';
+import { sellerSql } from '@/lib/invoices';
 
 const INCOME = ['Sales income', 'Export income', 'Exchange gain'], EXPENSE = ['Purchases / expenses', 'Exchange loss'];
 
-async function period(ids, from, to, entity) {
+async function period(ids, from, to, entity, seller) {
   const { rows } = await q(
     `SELECT l.account, to_char(date_trunc('month', l.entry_date),'YYYY-MM') AS m, SUM(l.credit) - SUM(l.debit) AS net
      FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id
-     WHERE l.account = ANY($1) AND l.entry_date BETWEEN $2 AND $3 AND ($4::int[] IS NULL OR i.created_by = ANY($4)) AND ($5::int IS NULL OR i.from_company_id=$5 OR i.to_company_id=$5)
-     GROUP BY 1,2 ORDER BY 2`, [[...INCOME, ...EXPENSE], from, to, ids, entity]);
+     WHERE l.account = ANY($1) AND l.entry_date BETWEEN $2 AND $3 AND ($4::int[] IS NULL OR i.created_by = ANY($4)) AND ($5::int IS NULL OR i.from_company_id=$5 OR i.to_company_id=$5) AND ${sellerSql(6)}
+     GROUP BY 1,2 ORDER BY 2`, [[...INCOME, ...EXPENSE], from, to, ids, entity, seller]);
   return rows;
 }
 const sumBy = (rows) => rows.reduce((a, r) => { a[r.account] = (a[r.account] || 0) + Number(r.net); return a; }, {});
 
 export const GET = route(async ({ req, user }) => {
   const u = new URL(req.url).searchParams, ids = await visibleIds(user), entity = u.get('company_id') || null;
-  const [cur, prev] = await Promise.all([period(ids, u.get('from'), u.get('to'), entity), period(ids, u.get('pfrom'), u.get('pto'), entity)]);
+  const seller = u.get('seller_id') || null;
+  const [cur, prev] = await Promise.all([period(ids, u.get('from'), u.get('to'), entity, seller), period(ids, u.get('pfrom'), u.get('pto'), entity, seller)]);
   const a = sumBy(cur), b = sumBy(prev);
   const lines = (names, sign) => names.map((n) => ({ account: n, current: sign * (a[n] || 0), previous: sign * (b[n] || 0) })).filter((l) => l.current || l.previous);
   const income = lines(INCOME, 1), expenses = lines(EXPENSE, -1);

@@ -14,7 +14,7 @@ export default function PL() {
   const max = Math.max(1, ...(data?.months || []).flatMap((m) => [m.income, m.expense]));
   return <>
     <div className="bar"><h2>Profit & Loss</h2></div>
-    <div className="filters"><CompanySelect companies={cos} value={co} onChange={setCo} label="Entity" all="All entities" /><FySelect value={fy} onChange={setFy} /></div>
+    <div className="filters"><FySelect value={fy} onChange={setFy} /></div>
     <p className="note">{r.label} against {p.label}. Built from approved tax invoices only; proformas never count.</p>
     {T && <div className="grid g2">
       <div className="card scroll"><table><thead><tr><th>Particulars (₹)</th><th className="n">{r.label}</th><th className="n">{p.label}</th><th className="n">Change</th></tr></thead><tbody>

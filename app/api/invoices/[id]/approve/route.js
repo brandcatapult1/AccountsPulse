@@ -16,7 +16,7 @@ export const POST = route(async ({ user, params }) => {
     const items = (await c.query('SELECT COALESCE(SUM(amount),0) s FROM invoice_items WHERE invoice_id=$1', [id])).rows[0].s;
     if (Math.abs(Number(items) - Number(inv.subtotal)) > 0.5) bad(`Line items add up to ${items} but the subtotal is ${inv.subtotal}.`);
     if (Math.abs(Number(inv.subtotal) + Number(inv.cgst) + Number(inv.sgst) + Number(inv.igst) - Number(inv.total)) > 1) bad('Subtotal + tax does not match the total.');
-    await c.query(`UPDATE invoices SET status='approved', approved_by=$1, approved_at=now() WHERE id=$2`, [user.id, id]);
+    await c.query(`UPDATE invoices SET status='approved', approved_by=$1, approved_at=now(), reviewed_by=$1, reviewed_at=now() WHERE id=$2`, [user.id, id]);
     if (inv.doc_type === 'tax') {
       await postInvoice(c, inv);
       if (inv.linked_proforma_id) {

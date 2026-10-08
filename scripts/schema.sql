@@ -101,3 +101,20 @@ CREATE TABLE IF NOT EXISTS audit_log (
   detail JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- v2: brand names, contacts, sellers, reviewer
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS brand_name TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS contacts JSONB NOT NULL DEFAULT '[]';
+CREATE TABLE IF NOT EXISTS company_sellers (
+  company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  seller_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  PRIMARY KEY (company_id, seller_id)
+);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reviewed_by INT REFERENCES users(id);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+UPDATE invoices SET reviewed_by = approved_by, reviewed_at = approved_at WHERE reviewed_by IS NULL AND approved_by IS NOT NULL;
+INSERT INTO company_sellers (company_id, seller_id)
+  SELECT DISTINCT CASE WHEN direction='sales' THEN to_company_id ELSE from_company_id END,
+                  CASE WHEN direction='sales' THEN from_company_id ELSE to_company_id END
+  FROM invoices WHERE from_company_id IS NOT NULL AND to_company_id IS NOT NULL
+  ON CONFLICT DO NOTHING;

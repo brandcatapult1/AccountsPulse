@@ -11,7 +11,7 @@ export default function Ledger() {
   const L = co && data?.entries ? data : null;
   return <>
     <div className="bar"><h2>Ledger{L ? ` · ${L.company.name}` : ''}</h2></div>
-    <div className="filters"><CompanySelect companies={cos} value={co} onChange={setCo} all="Choose a company" /><FySelect value={fy} onChange={setFy} />
+    <div className="filters"><CompanySelect companies={(cos || []).filter((c) => c.kind !== 'own')} value={co} onChange={setCo} all="Choose a company" /><FySelect value={fy} onChange={setFy} />
       <div className="fld"><label>Show</label><div className="seg">{['INR', 'Both'].map((x) => <button key={x} className={cur === x ? 'on' : ''} onClick={() => setCur(x)}>{x === 'Both' ? 'INR + original' : x}</button>)}</div></div></div>
     {!co && <p className="note">Pick a company to see its ledger for {r.label}.</p>}
     {error && co && <div className="err-box">{error}</div>}
