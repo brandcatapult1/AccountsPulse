@@ -44,21 +44,20 @@ export const PUT = route(async ({ req, user, params }) => {
   });
 });
 
-/** Anyone with access can delete an invoice that is still in review or rejected. Super Admin can also delete approved ones that have no payments. */
+/**
+ * Members can delete their own invoices while in review or rejected.
+ * Super Admin and Account Lead can delete any invoice they can see, in any status. That also removes its payments, ledger entries and follow-ups.
+ */
 export const DELETE = route(async ({ user, params }) => {
-  const id = +params.id;
+  const id = +params.id; const privileged = user.role === 'admin' || user.role === 'lead';
   const file = await tx(async (c) => {
     const inv = await loadInvoice(user, id, c);
-    if (inv.status !== 'review' && inv.status !== 'rejected') {
-      if (user.role !== 'admin') bad('Only invoices in review can be deleted. Ask a Super Admin for approved ones.', 403);
-      const p = await c.query('SELECT COUNT(*)::int n FROM payments WHERE invoice_id=$1 AND NOT voided', [id]);
-      if (p.rows[0].n) bad('Void its payments first.', 409);
-      const l = await c.query('SELECT COUNT(*)::int n FROM invoices WHERE linked_proforma_id=$1', [id]);
-      if (l.rows[0].n) bad('A tax invoice is linked to this proforma. Delete that first.', 409);
-    }
+    if (!privileged && inv.status !== 'review' && inv.status !== 'rejected') bad('Only invoices in review can be deleted. Ask your Account Lead or a Super Admin for approved ones.', 403);
+    const pays = (await c.query('SELECT COUNT(*)::int n, COALESCE(SUM(amount),0) s FROM payments WHERE invoice_id=$1 AND NOT voided', [id])).rows[0];
+    if (inv.doc_type === 'tax' && inv.linked_proforma_id) await c.query(`UPDATE invoices SET status='approved', paid=0, stage='pending' WHERE id=$1 AND status='converted'`, [inv.linked_proforma_id]);
     await c.query('UPDATE invoices SET linked_proforma_id=NULL WHERE linked_proforma_id=$1', [id]);
     await c.query('DELETE FROM invoices WHERE id=$1', [id]);
-    await audit(c, user, 'invoice.delete', 'invoice', id, { invoice_no: inv.invoice_no, status: inv.status });
+    await audit(c, user, 'invoice.delete', 'invoice', id, { invoice_no: inv.invoice_no, status: inv.status, doc_type: inv.doc_type, total: inv.total, currency: inv.currency, added_by: inv.created_name, payments_deleted: pays.n, payments_amount: pays.s });
     return inv.file_path;
   });
   if (file) await fs.unlink(path.join(path.resolve(process.env.UPLOAD_DIR || './storage/invoices'), path.basename(file))).catch(() => {});

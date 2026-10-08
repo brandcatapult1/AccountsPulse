@@ -138,6 +138,7 @@ export default function Invoice() {
         <div className="tl">{inv.followups.map((x) => <div key={x.id}>{x.channel}: {x.note}{x.promised_date ? ` · promised ${fdate(x.promised_date)}` : ''}<small>{x.by_name} · {fdate(x.created_at)}</small></div>)}</div></div>
     </div>}
     {!editable && inv.status === 'approved' && <ReopenBox id={id} onDone={reload} />}
+    {!editable && (['admin', 'lead'].includes(me?.role) || inv.status === 'rejected') && <DeleteBox inv={inv} onDone={() => router.push('/invoices')} />}
   </>;
 }
 
@@ -157,4 +158,17 @@ function ReopenBox({ id, onDone }) {
   return <div className="card"><button className="btn" onClick={() => setOpen(!open)}>Reopen for edits (Super Admin)</button>
     {open && <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}><input className="inp" style={{ flex: 1 }} placeholder="Reason, e.g. wrong tax rate" value={reason} onChange={(e) => setReason(e.target.value)} />
       <button className="btn dng" onClick={async () => { try { await api(`/invoices/${id}/reopen`, { method: 'POST', body: { reason } }); onDone(); } catch (e) { setErr(e.message); } }}>Reopen</button>{err && <div className="err-box" style={{ width: '100%' }}>{err}</div>}</div>}</div>;
+}
+
+function DeleteBox({ inv, onDone }) {
+  const [step, setStep] = useState(0); const [err, setErr] = useState('');
+  const pays = inv.payments.filter((p) => !p.voided);
+  return <div className="card" style={{ borderColor: 'var(--bad)' }}>
+    {step === 0 && <button className="btn dng" onClick={() => setStep(1)}>Delete this invoice</button>}
+    {step === 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <b>Delete {inv.invoice_no} for good?</b>
+      <span className="note">{inv.status === 'approved' || inv.status === 'converted' ? 'Its ledger entries, ' : ''}{pays.length ? `${pays.length} recorded payment${pays.length > 1 ? 's' : ''} (${inv.currency} ${inr2(pays.reduce((s, p) => s + num(p.amount), 0))}), ` : ''}follow-ups and the uploaded file are removed with it.{inv.proforma ? ` The linked proforma ${inv.proforma.invoice_no} goes back to awaiting payment.` : ''} This cannot be undone. It is recorded in the audit log.</span>
+      {err && <div className="err-box">{err}</div>}
+      <div style={{ display: 'flex', gap: 8 }}><button className="btn" onClick={() => setStep(0)}>Cancel</button><button className="btn dng" onClick={async () => { try { await api('/invoices/' + inv.id, { method: 'DELETE' }); onDone(); } catch (e) { setErr(e.message); } }}>Yes, delete it</button></div></div>}
+  </div>;
 }
