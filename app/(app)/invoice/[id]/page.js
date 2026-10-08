@@ -114,10 +114,10 @@ export default function Invoice() {
     {!editable && <div className="grid g2">
       <div className="card"><div className="bar"><h3>Payments</h3>{inv.status === 'approved' && inv.stage !== 'received' && <button className="btn pri" onClick={() => setShowPay(true)}>Record payment</button>}</div>
         {inv.proforma && <p className="note">Converted from proforma {inv.proforma.invoice_no}.</p>}{inv.converted_to && <p className="note">Converted to tax invoice {inv.converted_to.invoice_no}.</p>}
-        <p className="note">Paid {inv.currency} {inr2(inv.paid)} of {inr2(inv.total)}</p>
+        <p className="note">Paid {inv.currency} {inr2(inv.paid)} of {inr2(inv.total)}{inv.payments.some((p) => !p.voided && num(p.tds) > 0) ? ` · TDS deducted ₹ ${inr2(inv.payments.filter((p) => !p.voided).reduce((s, p) => s + num(p.tds), 0))}` : inv.paid > 0 ? ' · No TDS recorded' : ''}</p>
         <table><tbody>{inv.payments.map((p) => <tr key={p.id} style={p.voided ? { opacity: .5, textDecoration: 'line-through' } : null}>
           <td className="mono">{fdate(p.paid_on)}</td><td>{p.mode}<span className="fx">{Object.entries(p.details || {}).filter(([k, v]) => v && k !== 'status').map(([k, v]) => v).join(' · ')}{p.details?.status ? ' · ' + p.details.status : ''}</span></td>
-          <td className="n">{inr2(p.amount)}<span className="fx">{p.by_name}</span></td>
+          <td className="n">{inr2(p.amount)}{num(p.tds) > 0 && <span className="fx" style={{ color: 'var(--warn)' }}>TDS ₹ {inr2(p.tds)}</span>}<span className="fx">{p.by_name}</span></td>
           <td>{!p.voided && p.mode === 'Cheque' && <button className="btn dng" onClick={() => run(() => api(`/invoices/${id}/payments`, { method: 'PUT', body: { payment_id: p.id, action: 'bounce' } }), 'Cheque marked bounced')}>Bounced</button>}</td></tr>)}
           {!inv.payments.length && <tr><td className="note">No payments yet.</td></tr>}</tbody></table>
         {showPay && <RecordPayment inv={inv} onClose={() => setShowPay(false)} onDone={() => { setShowPay(false); reload(); }} />}

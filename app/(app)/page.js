@@ -33,7 +33,7 @@ export default function Dashboard() {
       <div className="kpis">
         <div className="kpi"><div className="l">Billed (tax)</div><div className="v">{lakh(k.billed)}</div><div className="d">{r.label}</div></div>
         <div className="kpi"><div className="l">Proforma pipeline</div><div className="v">{lakh(k.pipeline)}</div><div className="d">{k.pipeline_n} awaiting payment</div></div>
-        <div className="kpi"><div className="l">Collected</div><div className="v up">{lakh(k.collected)}</div><div className="d">cash + TDS</div></div>
+        <div className="kpi"><div className="l">Collected</div><div className="v up">{lakh(k.collected)}</div><div className="d">incl. TDS {lakh(k.tds)}</div></div>
         <div className="kpi"><div className="l">Outstanding</div><div className="v">{lakh(k.outstanding)}</div><div className="d">{k.outstanding_n} invoices</div></div>
         <div className="kpi bad"><div className="l">Overdue</div><div className="v">{lakh(k.overdue)}</div><div className="d dn">{k.overdue_n} past due</div></div>
         <div className="kpi"><div className="l">Net profit</div><div className="v">{lakh(k.profit)}</div><div className="d">income {lakh(k.income)} − expenses {lakh(k.expenses)}</div></div>

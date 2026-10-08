@@ -22,7 +22,7 @@ export const GET = route(async ({ req, user }) => {
         COALESCE(SUM(ROUND(GREATEST(total-paid,0)*fx_rate,2)) FILTER (WHERE doc_type='tax' AND direction='purchase' AND stage<>'received'),0) AS payable
        FROM invoices i WHERE ${W}`, P),
     q(`SELECT COALESCE(SUM(l.credit),0) AS income FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id WHERE l.account IN ('Sales income','Export income') AND ${W}`, P),
-    q(`SELECT COALESCE(SUM(p.amount_inr + p.tds),0) AS c FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE NOT p.voided AND i.direction='sales' AND i.status IN ('approved','converted') AND ($1::int[] IS NULL OR i.created_by = ANY($1)) AND p.paid_on BETWEEN $2 AND $3 AND ($4::int IS NULL OR i.from_company_id=$4 OR i.to_company_id=$4) AND ${sellerSql(5)}`, [ids, from, to, co, seller]),
+    q(`SELECT COALESCE(SUM(p.amount_inr + p.tds),0) AS c, COALESCE(SUM(p.tds),0) AS tds FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE NOT p.voided AND i.direction='sales' AND i.status IN ('approved','converted') AND ($1::int[] IS NULL OR i.created_by = ANY($1)) AND p.paid_on BETWEEN $2 AND $3 AND ($4::int IS NULL OR i.from_company_id=$4 OR i.to_company_id=$4) AND ${sellerSql(5)}`, [ids, from, to, co, seller]),
     q(`SELECT to_char(date_trunc('month', i.invoice_date),'YYYY-MM') AS m,
         COALESCE(SUM(total_inr) FILTER (WHERE doc_type='tax' AND direction='sales'),0) AS billed,
         COALESCE(SUM(total_inr) FILTER (WHERE doc_type='proforma' AND direction='sales'),0) AS proforma,
@@ -38,6 +38,6 @@ export const GET = route(async ({ req, user }) => {
   const exp = await q(`SELECT COALESCE(SUM(l.debit),0) AS e FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id WHERE l.account IN ('Purchases / expenses','Exchange loss') AND ${W}`, P);
   const gain = await q(`SELECT COALESCE(SUM(l.credit),0) AS g FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id WHERE l.account='Exchange gain' AND ${W}`, P);
   const income = Number(sales.rows[0].income) + Number(gain.rows[0].g);
-  return { kpis: { ...k.rows[0], collected: collected.rows[0].c, income, expenses: Number(exp.rows[0].e), profit: income - Number(exp.rows[0].e) },
+  return { kpis: { ...k.rows[0], collected: collected.rows[0].c, tds: collected.rows[0].tds, income, expenses: Number(exp.rows[0].e), profit: income - Number(exp.rows[0].e) },
     months: months.rows, ageing: Object.fromEntries(['a', 'b', 'c', 'd'].map((x) => [x, Number(ageing.rows.find((r) => r.bucket === x)?.amt || 0)])), fx: fx.rows, top: top.rows, queue: queue.rows };
 });

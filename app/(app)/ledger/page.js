@@ -20,7 +20,7 @@ export default function Ledger() {
         <div className="kpi bad"><div className="l">Closing {L.closing >= 0 ? '(Dr)' : '(Cr)'}</div><div className="v">{lakh(Math.abs(L.closing))}</div></div></div>
       <div className="card scroll"><table><thead><tr><th>Date</th><th>Particulars</th><th>Ref</th><th className="n">Debit ₹</th><th className="n">Credit ₹</th><th className="n">Balance ₹</th></tr></thead><tbody>
         <tr><td /><td><i>Opening balance</i></td><td /><td /><td /><td className="n">{inr2(Math.abs(L.opening))} {L.opening >= 0 ? 'Dr' : 'Cr'}</td></tr>
-        {L.entries.map((e) => <tr key={e.id}><td className="mono">{fdate(e.entry_date)}</td><td>{e.account}<span className="fx">{e.narration}{cur === 'Both' && e.currency && e.currency !== 'INR' ? ` · ${e.currency} ${e.total} @ ${e.fx_rate}` : ''}</span></td>
+        {L.entries.map((e) => <tr key={e.id}><td className="mono">{fdate(e.entry_date)}</td><td>{e.account}<span className="fx">{e.narration}{Number(e.pay_tds) > 0 ? ` · cash ₹ ${inr2(e.pay_cash)} + TDS ₹ ${inr2(e.pay_tds)}` : ''}{cur === 'Both' && e.currency && e.currency !== 'INR' ? ` · ${e.currency} ${e.total} @ ${e.fx_rate}` : ''}</span></td>
           <td className="mono">{e.invoice_id ? <Link href={'/invoice/' + e.invoice_id} style={{ textDecoration: 'underline' }}>{e.invoice_no}</Link> : ''}</td>
           <td className="n">{Number(e.debit) ? inr2(e.debit) : ''}</td><td className="n">{Number(e.credit) ? inr2(e.credit) : ''}</td><td className="n">{inr2(Math.abs(e.balance))} {e.balance >= 0 ? 'Dr' : 'Cr'}</td></tr>)}
         {!L.entries.length && <tr><td colSpan="6" className="note">No entries in this period.</td></tr>}
