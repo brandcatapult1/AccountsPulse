@@ -3,15 +3,24 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApi, Money, TypeBadge, fdate, num, inr } from '@/lib/client';
 import { Seg, CompanySelect, OwnerSelect } from '@/components/Filters';
+import FollowupLog from './log';
 
 export default function Followups() {
+  const [tab, setTab] = useState('pending');
+  return <>
+    <div className="bar"><h2>Follow-ups</h2></div>
+    <div className="filters"><Seg value={tab} onChange={setTab} options={[['pending', 'Pending payments'], ['log', 'Follow-up log by team']]} /></div>
+    {tab === 'pending' ? <Pending /> : <FollowupLog />}
+  </>;
+}
+
+function Pending() {
   const router = useRouter(); const [dt, setDt] = useState(''); const [co, setCo] = useState(''); const [owner, setOwner] = useState(''); const [od, setOd] = useState('');
   const qs = new URLSearchParams(Object.entries({ status: 'approved', doc_type: dt, company_id: co, owner }).filter(([, v]) => v)).toString();
   const { data } = useApi('/invoices?' + qs); const { data: cos } = useApi('/companies'); const { data: me } = useApi('/me'); const { data: team } = useApi('/users');
   const today = new Date().toISOString().slice(0, 10);
   const rows = (data || []).filter((i) => i.stage !== 'received' && (!od || (od === 'overdue' ? String(i.due_date).slice(0, 10) < today : i.promised_date)));
   return <>
-    <div className="bar"><h2>Pending payments</h2></div>
     <div className="filters"><Seg value={dt} onChange={setDt} options={[['', 'All'], ['proforma', 'Proforma'], ['tax', 'Tax']]} /><CompanySelect companies={cos} value={co} onChange={setCo} /><OwnerSelect user={me} team={team} value={owner} onChange={setOwner} />
       <Seg value={od} onChange={setOd} options={[['', 'Any'], ['overdue', 'Overdue'], ['promised', 'Has promise']]} /></div>
     <div className="card scroll"><table><thead><tr><th>Company</th><th>Invoice</th><th className="n">Pending</th><th>Age</th><th>Due</th><th>Promised</th><th>Owner</th></tr></thead><tbody>
