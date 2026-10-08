@@ -13,7 +13,8 @@ function F({ label, id, flags, fields, children, hint }) {
 export default function Invoice() {
   const { id } = useParams(); const router = useRouter();
   const { data: inv, reload } = useApi('/invoices/' + id);
-  const { data: companies } = useApi('/companies?all=1');
+  const { data: companies } = useApi('/companies?all=1'); const { data: me } = useApi('/me');
+  const [editDesc, setEditDesc] = useState(null);
   const [f, setF] = useState(null); const [msg, setMsg] = useState(null); const [busy, setBusy] = useState(false); const [showPay, setShowPay] = useState(false);
   const [proformas, setProformas] = useState([]); const [confirmDel, setConfirmDel] = useState(false);
   useEffect(() => { if (inv) setF({ ...inv, invoice_date: iso(inv.invoice_date), due_date: iso(inv.due_date), fx_date: iso(inv.fx_date), items: inv.items.map((i) => ({ ...i })) }); }, [inv]);
@@ -73,14 +74,15 @@ export default function Invoice() {
           </div>
           <div className="scroll"><table><thead><tr><th>Description</th><th>HSN/SAC</th><th className="n">Qty</th><th className="n">Rate</th><th className="n">Amount</th><th /></tr></thead><tbody>
             {f.items.map((it, n) => <tr key={n}>
-              <td><input className="inp" aria-label="Description" value={it.description} onChange={(e) => setItem(n, 'description', e.target.value)} /></td>
+              <td><input className="inp" aria-label="Description head" placeholder="Head (first line)" style={{ fontWeight: 700 }} value={it.description} onChange={(e) => setItem(n, 'description', e.target.value)} />
+                <textarea className="inp" aria-label="Description lines" placeholder="More lines, one per line" rows={Math.max(2, String(it.details || '').split('\n').length)} style={{ marginTop: 4, resize: 'vertical' }} value={it.details || ''} onChange={(e) => setItem(n, 'details', e.target.value)} /></td>
               <td style={{ width: 90 }}><input className="inp" aria-label="HSN" value={it.hsn || ''} onChange={(e) => setItem(n, 'hsn', e.target.value)} /></td>
               <td style={{ width: 84 }}><input className="inp" aria-label="Qty" type="number" value={it.qty} onChange={(e) => setItem(n, 'qty', e.target.value)} /></td>
               <td style={{ width: 100 }}><input className="inp" aria-label="Rate" type="number" step="0.01" value={it.rate} onChange={(e) => setItem(n, 'rate', e.target.value)} /></td>
               <td style={{ width: 110 }}><input className="inp" aria-label="Amount" type="number" step="0.01" value={it.amount} onChange={(e) => setItem(n, 'amount', e.target.value)} /></td>
               <td>{editable && <button type="button" className="btn dng" onClick={() => setF((x) => { const items = x.items.filter((_, i) => i !== n); return { ...x, items, subtotal: items.reduce((s, i) => s + num(i.amount), 0) }; })}>✕</button>}</td></tr>)}
           </tbody></table></div>
-          {editable && <div><button type="button" className="btn" onClick={() => setF((x) => ({ ...x, items: [...x.items, { description: '', hsn: '', qty: 1, rate: 0, amount: 0 }] }))}>+ Add line</button></div>}
+          {editable && <div><button type="button" className="btn" onClick={() => setF((x) => ({ ...x, items: [...x.items, { description: '', details: '', hsn: '', qty: 1, rate: 0, amount: 0 }] }))}>+ Add line</button></div>}
           <div className="frow">
             <F label="Subtotal" id="st" flags={flags} fields={['items']}><input id="st" type="number" step="0.01" value={f.subtotal} onChange={(e) => set('subtotal', e.target.value)} /></F>
             <F label="CGST" id="cg"><input id="cg" type="number" step="0.01" value={f.cgst} onChange={(e) => set('cgst', e.target.value)} /></F>
@@ -111,6 +113,16 @@ export default function Invoice() {
       </div>
     </div>
 
+    {!editable && <div className="card scroll"><div className="bar"><h3>Items</h3>
+        {['admin', 'lead'].includes(me?.role) && inv.status !== 'rejected' && (editDesc
+          ? <div className="filters"><button className="btn" onClick={() => setEditDesc(null)}>Cancel</button><button className="btn pri" onClick={() => run(async () => { await api(`/invoices/${id}/descriptions`, { method: 'PUT', body: { items: editDesc } }); setEditDesc(null); }, 'Descriptions saved')}>Save wording</button></div>
+          : <button className="btn" onClick={() => setEditDesc(inv.items.map((i) => ({ id: i.id, description: i.description || '', details: i.details || '' })))}>Edit descriptions</button>)}</div>
+      <table><thead><tr><th>Description</th><th>HSN/SAC</th><th className="n">Qty</th><th className="n">Amount</th></tr></thead><tbody>
+        {inv.items.map((it, n) => <tr key={it.id}><td>{editDesc ? <>
+            <input className="inp" aria-label="Description head" style={{ fontWeight: 700 }} value={editDesc[n].description} onChange={(e) => setEditDesc(editDesc.map((x, i) => i === n ? { ...x, description: e.target.value } : x))} />
+            <textarea className="inp" aria-label="Description lines" rows={Math.max(2, editDesc[n].details.split('\n').length)} style={{ marginTop: 4 }} value={editDesc[n].details} onChange={(e) => setEditDesc(editDesc.map((x, i) => i === n ? { ...x, details: e.target.value } : x))} /></>
+          : <><b>{it.description}</b>{it.details && <div className="note" style={{ whiteSpace: 'pre-line' }}>{it.details}</div>}</>}</td>
+          <td className="mono">{it.hsn}</td><td className="n">{num(it.qty)}</td><td className="n">{inr2(it.amount)}</td></tr>)}</tbody></table></div>}
     {!editable && <div className="grid g2">
       <div className="card"><div className="bar"><h3>Payments</h3>{inv.status === 'approved' && inv.stage !== 'received' && <button className="btn pri" onClick={() => setShowPay(true)}>Record payment</button>}</div>
         {inv.proforma && <p className="note">Converted from proforma {inv.proforma.invoice_no}.</p>}{inv.converted_to && <p className="note">Converted to tax invoice {inv.converted_to.invoice_no}.</p>}

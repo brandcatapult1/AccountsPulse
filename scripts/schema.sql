@@ -118,3 +118,4 @@ INSERT INTO company_sellers (company_id, seller_id)
                   CASE WHEN direction='sales' THEN from_company_id ELSE to_company_id END
   FROM invoices WHERE from_company_id IS NOT NULL AND to_company_id IS NOT NULL
   ON CONFLICT DO NOTHING;
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS details TEXT;

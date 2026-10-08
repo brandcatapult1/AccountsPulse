@@ -28,7 +28,7 @@ export const PUT = route(async ({ req, user, params }) => {
     if (inv.status !== 'review') bad('Only invoices in review can be edited. Super Admin can reopen an approved one.', 409);
     const fx = b.currency === 'INR' ? 1 : +b.fx_rate;
     if (!(fx > 0)) bad('Enter the exchange rate.');
-    const items = (b.items || []).map((i, n) => ({ sl: n + 1, description: i.description || '', hsn: i.hsn || '', qty: +i.qty || 1, rate: r2(i.rate), amount: r2(i.amount) }));
+    const items = (b.items || []).map((i, n) => ({ sl: n + 1, description: i.description || '', details: i.details || '', hsn: i.hsn || '', qty: +i.qty || 1, rate: r2(i.rate), amount: r2(i.amount) }));
     const subtotal = r2(b.subtotal ?? items.reduce((s, i) => s + i.amount, 0));
     const total = r2(b.total ?? subtotal + r2(b.cgst) + r2(b.sgst) + r2(b.igst));
     await c.query(
@@ -37,7 +37,7 @@ export const PUT = route(async ({ req, user, params }) => {
       [b.direction, b.doc_type, b.invoice_no?.trim() || null, b.invoice_date || null, b.due_date || null, b.from_company_id || null, b.to_company_id || null, (b.currency || 'INR').toUpperCase(), fx, b.fx_date || null,
        subtotal, r2(b.cgst), r2(b.sgst), r2(b.igst), total, r2(total * fx), b.linked_proforma_id || null, b.notes || null, id]);
     await c.query('DELETE FROM invoice_items WHERE invoice_id=$1', [id]);
-    for (const i of items) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, i.sl, i.description, i.hsn, i.qty, i.rate, i.amount]);
+    for (const i of items) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,details,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, i.sl, i.description, i.details, i.hsn, i.qty, i.rate, i.amount]);
     await linkParty(c, b.direction, +b.from_company_id || null, +b.to_company_id || null);
     await audit(c, user, 'invoice.edit', 'invoice', id);
     return { ok: true };

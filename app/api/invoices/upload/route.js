@@ -57,7 +57,7 @@ export const POST = route(async ({ req, user }) => {
       [direction, docType, ex.invoiceNo || null, ex.invoiceDate || null, ex.dueDate || null, fromId || null, toId || null, cur, ex.subtotal || 0, t.cgst || 0, t.sgst || 0, t.igst || 0, ex.total || 0,
        file.name, stored, MIME[ext], JSON.stringify({ ...ex, rawText: undefined }), JSON.stringify(ex.flags || []), user.id]);
     const id = rows[0].id;
-    for (const [n, it] of (ex.items || []).entries()) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, n + 1, it.description, it.hsn, it.qty ?? 1, it.rate ?? 0, it.amount ?? 0]);
+    for (const [n, it] of (ex.items || []).entries()) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,details,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, n + 1, it.description, it.details || '', it.hsn, it.qty ?? 1, it.rate ?? 0, it.amount ?? 0]);
     await linkParty(c, direction, fromId, toId);
     await audit(c, user, 'invoice.upload', 'invoice', id, { file: file.name, docType });
     return { id, invoice_no: ex.invoiceNo, doc_type: docType, flags: ex.flags || [], total: ex.total, currency: cur };
