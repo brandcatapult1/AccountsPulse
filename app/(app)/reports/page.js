@@ -22,8 +22,8 @@ function Pending() {
   const qs = new URLSearchParams(Object.entries({ direction: dir, doc_type: dt, stage, company_id: co }).filter(([, v]) => v)).toString();
   const { data, error } = useApi('/reports/pending?' + qs);
   const G = data?.groups || []; const who = dir === 'sales' ? 'Client' : 'Vendor';
-  const exportCsv = () => download(`pending-${dir}.csv`, csv([[who, 'Brand', 'Invoice', 'Type', 'Invoice date', 'Due date', 'Currency', 'Total', 'Paid', 'Pending', 'Pending (INR)', 'Status'],
-    ...G.flatMap((g) => g.invoices.map((i) => [g.name, g.brand_name, i.invoice_no, i.doc_type, i.invoice_date, i.due_date, i.currency, i.total, i.paid, i.due, i.due_inr, i.stage === 'part' ? 'Part paid' : 'Pending']))]));
+  const exportCsv = () => download(`pending-${dir}.csv`, csv([[who, 'Brand', 'Invoice', 'Type', 'Invoice date', 'Due date', 'Currency', 'Total', 'Paid', 'TDS deducted', 'Pending', 'Pending (INR)', 'Status'],
+    ...G.flatMap((g) => g.invoices.map((i) => [g.name, g.brand_name, i.invoice_no, i.doc_type, i.invoice_date, i.due_date, i.currency, i.total, i.paid, i.tds, i.due, i.due_inr, i.stage === 'part' ? 'Part paid' : 'Pending']))]));
   return <>
     <div className="filters"><Seg value={dir} onChange={(v) => { setDir(v); setCo(''); }} options={[['sales', 'Clients (we raised)'], ['purchase', 'Vendors (we received)']]} />
       <Seg value={dt} onChange={setDt} options={[['tax', 'Tax invoices'], ['proforma', 'Proforma'], ['', 'Both']]} />
@@ -33,21 +33,22 @@ function Pending() {
     {error && <div className="err-box">{error}</div>}
     {data && <div className="kpis">
       <div className="kpi"><div className="l">Total pending</div><div className="v">{lakh(data.total_inr)}</div><div className="d">{data.invoice_count} invoices · {G.length} {who.toLowerCase()}s</div></div>
-      <div className="kpi bad"><div className="l">Of which overdue</div><div className="v">{lakh(data.overdue_inr)}</div><div className="d">past due date</div></div></div>}
-    <div className="card scroll"><table><thead><tr><th>{who} (legal name / brand)</th><th>Contact</th><th className="n">Invoices</th><th className="n">Overdue ₹</th><th className="n">Pending ₹</th></tr></thead><tbody>
+      <div className="kpi bad"><div className="l">Of which overdue</div><div className="v">{lakh(data.overdue_inr)}</div><div className="d">past due date</div></div>
+      <div className="kpi"><div className="l">TDS deducted so far</div><div className="v">{lakh(data.tds)}</div><div className="d">on these invoices</div></div></div>}
+    <div className="card scroll"><table><thead><tr><th>{who} (legal name / brand)</th><th>Contact</th><th className="n">Invoices</th><th className="n">TDS ₹</th><th className="n">Overdue ₹</th><th className="n">Pending ₹</th></tr></thead><tbody>
       {G.map((g) => { const isOpen = open[g.party_id]; const poc = (g.contacts || [])[0]; return [
         <tr key={g.party_id} className="click" onClick={() => setOpen({ ...open, [g.party_id]: !isOpen })}>
           <td><b>{isOpen ? '▾' : '▸'} {g.name}</b>{g.brand_name && <span className="fx">{g.brand_name}</span>}</td>
           <td>{poc ? <>{poc.name}<span className="fx">{[poc.phone, poc.email].filter(Boolean).join(' · ')}</span></> : <span className="note">—</span>}</td>
-          <td className="n">{g.invoices.length}</td><td className="n" style={{ color: g.overdue_inr ? 'var(--bad)' : undefined }}>{g.overdue_inr ? inr2(g.overdue_inr) : '—'}</td><td className="n"><b>{inr2(g.due_inr)}</b></td></tr>,
-        isOpen && <tr key={g.party_id + 'd'}><td colSpan="5" style={{ background: 'var(--bg)' }}>
-          <table><thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th className="n">Total</th><th className="n">Paid</th><th className="n">Pending</th><th>Status</th></tr></thead><tbody>
+          <td className="n">{g.invoices.length}</td><td className="n">{g.tds > 0 ? inr2(g.tds) : '—'}</td><td className="n" style={{ color: g.overdue_inr ? 'var(--bad)' : undefined }}>{g.overdue_inr ? inr2(g.overdue_inr) : '—'}</td><td className="n"><b>{inr2(g.due_inr)}</b></td></tr>,
+        isOpen && <tr key={g.party_id + 'd'}><td colSpan="6" style={{ background: 'var(--bg)' }}>
+          <table><thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th className="n">Total</th><th className="n">Paid</th><th className="n">TDS</th><th className="n">Pending</th><th>Status</th></tr></thead><tbody>
             {g.invoices.map((i) => <tr key={i.id}><td className="mono"><Link href={'/invoice/' + i.id} style={{ textDecoration: 'underline' }}>{i.invoice_no}</Link> <TypeBadge t={i.doc_type} /></td>
               <td className="mono">{fdate(i.invoice_date)}</td><td className="mono">{fdate(i.due_date)} {i.overdue && <span className="pill p-bad">overdue</span>}</td>
-              <td className="n">{i.currency === 'INR' ? inr2(i.total) : `${i.currency} ${inr2(i.total)}`}</td><td className="n">{inr2(i.paid)}</td>
+              <td className="n">{i.currency === 'INR' ? inr2(i.total) : `${i.currency} ${inr2(i.total)}`}</td><td className="n">{inr2(i.paid)}</td><td className="n">{num(i.tds) > 0 ? <span style={{ color: 'var(--warn)' }}>{inr2(i.tds)}</span> : '—'}</td>
               <td className="n"><b>{i.currency === 'INR' ? inr2(i.due) : `${i.currency} ${inr2(i.due)}`}</b>{i.currency !== 'INR' && <span className="fx">≈ {inr(i.due_inr)}</span>}</td><td><StageBadge s={i.stage} status="approved" /></td></tr>)}
           </tbody></table></td></tr>]; })}
-      {data && !G.length && <tr><td colSpan="5" className="note">Nothing pending for these filters.</td></tr>}
+      {data && !G.length && <tr><td colSpan="6" className="note">Nothing pending for these filters.</td></tr>}
     </tbody></table></div>
     <p className="note">Click a name to see its invoices. Totals are in INR; foreign-currency invoices also show the original amount.</p>
   </>;
