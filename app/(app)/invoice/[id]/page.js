@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api, useApi, inr, inr2, num, fdate, iso, TypeBadge, StageBadge } from '@/lib/client';
+import { coLabel, api, useApi, inr, inr2, num, fdate, iso, TypeBadge, StageBadge } from '@/lib/client';
 import RecordPayment from '@/components/RecordPayment';
 
 const flagFor = (flags, ...fields) => (flags || []).find((f) => fields.includes(f.field));
@@ -60,8 +60,8 @@ export default function Invoice() {
             <F label="Due date" id="dd" flags={flags} fields={['dueDate']}><input id="dd" type="date" value={f.due_date} onChange={(e) => set('due_date', e.target.value)} /></F>
           </div>
           <div className="frow">
-            <F label="From (seller)" id="fc" flags={flags} fields={['fromGstin', 'parties']}><select id="fc" value={f.from_company_id || ''} onChange={(e) => set('from_company_id', +e.target.value || null)}><option value="">Choose…</option>{parties().map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
-            <F label="To (buyer)" id="tc" flags={flags} fields={['toGstin']}><select id="tc" value={f.to_company_id || ''} onChange={(e) => set('to_company_id', +e.target.value || null)}><option value="">Choose…</option>{parties().map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
+            <F label="From (seller)" id="fc" flags={flags} fields={['fromGstin', 'parties']}><select id="fc" value={f.from_company_id || ''} onChange={(e) => set('from_company_id', +e.target.value || null)}><option value="">Choose…</option>{parties().map((c) => <option key={c.id} value={c.id}>{coLabel(c)}</option>)}</select></F>
+            <F label="To (buyer)" id="tc" flags={flags} fields={['toGstin']}><select id="tc" value={f.to_company_id || ''} onChange={(e) => set('to_company_id', +e.target.value || null)}><option value="">Choose…</option>{parties().map((c) => <option key={c.id} value={c.id}>{coLabel(c)}</option>)}</select></F>
           </div>
           <div className="link" style={{ alignItems: 'flex-end' }}>
             <b style={{ minWidth: '100%' }}>Currency</b>
