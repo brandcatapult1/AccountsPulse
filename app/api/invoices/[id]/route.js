@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { route, bad, audit } from '@/lib/api';
 import { q, tx } from '@/lib/db';
 import { loadInvoice } from '@/lib/invoices';
@@ -41,13 +43,23 @@ export const PUT = route(async ({ req, user, params }) => {
   });
 });
 
+/** Anyone with access can delete an invoice that is still in review or rejected. Super Admin can also delete approved ones that have no payments. */
 export const DELETE = route(async ({ user, params }) => {
   const id = +params.id;
-  return tx(async (c) => {
-    const p = await c.query('SELECT COUNT(*)::int n FROM payments WHERE invoice_id=$1 AND NOT voided', [id]);
-    if (p.rows[0].n) bad('Void its payments first.', 409);
+  const file = await tx(async (c) => {
+    const inv = await loadInvoice(user, id, c);
+    if (inv.status !== 'review' && inv.status !== 'rejected') {
+      if (user.role !== 'admin') bad('Only invoices in review can be deleted. Ask a Super Admin for approved ones.', 403);
+      const p = await c.query('SELECT COUNT(*)::int n FROM payments WHERE invoice_id=$1 AND NOT voided', [id]);
+      if (p.rows[0].n) bad('Void its payments first.', 409);
+      const l = await c.query('SELECT COUNT(*)::int n FROM invoices WHERE linked_proforma_id=$1', [id]);
+      if (l.rows[0].n) bad('A tax invoice is linked to this proforma. Delete that first.', 409);
+    }
+    await c.query('UPDATE invoices SET linked_proforma_id=NULL WHERE linked_proforma_id=$1', [id]);
     await c.query('DELETE FROM invoices WHERE id=$1', [id]);
-    await audit(c, user, 'invoice.delete', 'invoice', id);
-    return { ok: true };
+    await audit(c, user, 'invoice.delete', 'invoice', id, { invoice_no: inv.invoice_no, status: inv.status });
+    return inv.file_path;
   });
-}, { roles: ['admin'] });
+  if (file) await fs.unlink(path.join(path.resolve(process.env.UPLOAD_DIR || './storage/invoices'), path.basename(file))).catch(() => {});
+  return { ok: true };
+});

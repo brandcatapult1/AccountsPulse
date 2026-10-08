@@ -15,7 +15,7 @@ export default function Invoice() {
   const { data: inv, reload } = useApi('/invoices/' + id);
   const { data: companies } = useApi('/companies');
   const [f, setF] = useState(null); const [msg, setMsg] = useState(null); const [busy, setBusy] = useState(false); const [showPay, setShowPay] = useState(false);
-  const [proformas, setProformas] = useState([]);
+  const [proformas, setProformas] = useState([]); const [confirmDel, setConfirmDel] = useState(false);
   useEffect(() => { if (inv) setF({ ...inv, invoice_date: iso(inv.invoice_date), due_date: iso(inv.due_date), fx_date: iso(inv.fx_date), items: inv.items.map((i) => ({ ...i })) }); }, [inv]);
   const partyId = f && (f.direction === 'sales' ? f.to_company_id : f.from_company_id);
   useEffect(() => { if (f?.doc_type === 'tax' && partyId) api(`/invoices?doc_type=proforma&status=approved&company_id=${partyId}`).then(setProformas).catch(() => {}); else setProformas([]); }, [f?.doc_type, partyId]);
@@ -102,6 +102,7 @@ export default function Invoice() {
             <tr><td>{sales ? (foreign ? 'Cr Export income' : 'Cr Sales income') : 'Dr GST input'}</td><td className="n">{inr2(sales ? (calcTotal - taxSum) * fx : taxSum * fx)}</td></tr>
             <tr><td>{sales ? 'Cr GST payable' : 'Cr Payable'}</td><td className="n">{inr2(sales ? taxSum * fx : calcTotal * fx)}</td></tr></tbody></table>}</div>}
         {editable && <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button className="btn dng" disabled={busy} onClick={() => { if (!confirmDel) return setConfirmDel(true); run(async () => { await api(`/invoices/${id}`, { method: 'DELETE' }); router.push('/review'); }, 'Deleted'); }}>{confirmDel ? 'Click again to delete for good' : 'Delete'}</button>
           <button className="btn dng" disabled={busy} onClick={() => run(async () => { await api(`/invoices/${id}/reject`, { method: 'POST', body: {} }); router.push('/review'); }, 'Rejected')}>Reject</button>
           <button className="btn" disabled={busy} onClick={() => run(save, 'Draft saved')}>Save draft</button>
           <button className="btn pri" disabled={busy} onClick={() => run(async () => { await save(); await api(`/invoices/${id}/approve`, { method: 'POST' }); }, 'Approved' + (f.doc_type === 'tax' ? ' and posted to the ledger' : ''))}>Approve{f.doc_type === 'tax' ? ' & post to ledger' : ''}</button></div>}
