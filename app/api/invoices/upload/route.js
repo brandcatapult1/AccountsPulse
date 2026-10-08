@@ -26,7 +26,7 @@ export const POST = route(async ({ req, user }) => {
   const direction = form.get('direction') === 'purchase' ? 'purchase' : 'sales';
   const buf = Buffer.from(await file.arrayBuffer());
   let ex;
-  if (ext === '.pdf') ex = await extractInvoice(buf).catch((e) => ({ flags: [{ field: 'file', level: 'red', msg: 'Could not read this PDF: ' + e.message }], items: [], taxes: {}, needsManual: true }));
+  if (ext === '.pdf') { try { ex = await extractInvoice(buf); } catch (e) { console.error('extract failed', e); bad('Could not read this PDF (' + String(e.message).slice(0, 200) + '). Nothing was saved. Try again, or contact support if it keeps happening.', 422); } }
   else ex = { flags: [{ field: 'file', level: 'red', msg: 'Photos cannot be read automatically yet. Enter the details by hand.' }], items: [], taxes: {}, needsManual: true };
 
   const docType = form.get('doc_type') || ex.docType || 'tax';
