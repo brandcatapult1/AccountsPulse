@@ -120,3 +120,22 @@ INSERT INTO company_sellers (company_id, seller_id)
   ON CONFLICT DO NOTHING;
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS details TEXT;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_accounts JSONB NOT NULL DEFAULT '[]';
+
+-- v3: petty cash and daily expenses
+CREATE TABLE IF NOT EXISTS vouchers (
+  id SERIAL PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('petty_in','expense')),
+  voucher_date DATE NOT NULL,
+  seller_id INT REFERENCES companies(id),
+  amount NUMERIC(16,2) NOT NULL,
+  category TEXT, description TEXT,
+  source TEXT NOT NULL DEFAULT 'Petty cash',
+  account TEXT, from_name TEXT,
+  vendor_id INT REFERENCES companies(id),
+  reference TEXT,
+  file_name TEXT, file_path TEXT, file_mime TEXT,
+  created_by INT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS vouchers_date_idx ON vouchers (voucher_date);
+ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS voucher_id INT REFERENCES vouchers(id) ON DELETE CASCADE;

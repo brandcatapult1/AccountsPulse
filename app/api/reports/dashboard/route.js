@@ -36,8 +36,9 @@ export const GET = route(async ({ req, user }) => {
     q(`SELECT i.id,i.invoice_no,i.doc_type,u.name AS created_name,fc.name AS from_name,tc.name AS to_name,i.flags FROM invoices i LEFT JOIN users u ON u.id=i.created_by LEFT JOIN companies fc ON fc.id=i.from_company_id LEFT JOIN companies tc ON tc.id=i.to_company_id WHERE i.status='review' AND ($1::int[] IS NULL OR i.created_by = ANY($1)) AND ${sellerSql(2)} ORDER BY i.created_at DESC LIMIT 8`, [ids, seller]),
   ]);
   const exp = await q(`SELECT COALESCE(SUM(l.debit),0) AS e FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id WHERE l.account IN ('Purchases / expenses','Exchange loss') AND ${W}`, P);
+  const vexp = await q(`SELECT COALESCE(SUM(l.debit),0) AS e FROM ledger_entries l JOIN vouchers v ON v.id=l.voucher_id WHERE l.account LIKE 'Expense:%' AND l.entry_date BETWEEN $2 AND $3 AND ($1::int[] IS NULL OR v.created_by = ANY($1)) AND ($4::int IS NULL OR v.seller_id=$4) AND $5::int IS NULL`, [ids, from, to, seller, co]);
   const gain = await q(`SELECT COALESCE(SUM(l.credit),0) AS g FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id WHERE l.account='Exchange gain' AND ${W}`, P);
   const income = Number(sales.rows[0].income) + Number(gain.rows[0].g);
-  return { kpis: { ...k.rows[0], collected: collected.rows[0].c, tds: collected.rows[0].tds, income, expenses: Number(exp.rows[0].e), profit: income - Number(exp.rows[0].e) },
+  return { kpis: { ...k.rows[0], collected: collected.rows[0].c, tds: collected.rows[0].tds, income, expenses: Number(exp.rows[0].e) + Number(vexp.rows[0].e), profit: income - Number(exp.rows[0].e) - Number(vexp.rows[0].e) },
     months: months.rows, ageing: Object.fromEntries(['a', 'b', 'c', 'd'].map((x) => [x, Number(ageing.rows.find((r) => r.bucket === x)?.amt || 0)])), fx: fx.rows, top: top.rows, queue: queue.rows };
 });
