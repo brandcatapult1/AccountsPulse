@@ -1,4 +1,5 @@
 'use client';
+import { usePaged, Pager } from '@/components/Pager';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useApi, inr, inr2, num, fdate, lakh, fyOf, fyRange, TypeBadge, StageBadge } from '@/lib/client';
@@ -21,7 +22,7 @@ function Pending() {
   const { data: cos } = useApi('/companies');
   const qs = new URLSearchParams(Object.entries({ direction: dir, doc_type: dt, stage, company_id: co }).filter(([, v]) => v)).toString();
   const { data, error } = useApi('/reports/pending?' + qs);
-  const G = data?.groups || []; const who = dir === 'sales' ? 'Client' : 'Vendor';
+  const G = data?.groups || []; const pg = usePaged(G, qs, 25); const who = dir === 'sales' ? 'Client' : 'Vendor';
   const exportCsv = () => download(`pending-${dir}.csv`, csv([[who, 'Brand', 'Invoice', 'Type', 'Invoice date', 'Due date', 'Currency', 'Total', 'Paid', 'TDS deducted', 'Pending', 'Pending (INR)', 'Status'],
     ...G.flatMap((g) => g.invoices.map((i) => [g.name, g.brand_name, i.invoice_no, i.doc_type, i.invoice_date, i.due_date, i.currency, i.total, i.paid, i.tds, i.due, i.due_inr, i.stage === 'part' ? 'Part paid' : 'Pending']))]));
   return <>
@@ -36,7 +37,7 @@ function Pending() {
       <div className="kpi bad"><div className="l">Of which overdue</div><div className="v">{lakh(data.overdue_inr)}</div><div className="d">past due date</div></div>
       <div className="kpi"><div className="l">TDS deducted so far</div><div className="v">{lakh(data.tds)}</div><div className="d">on these invoices</div></div></div>}
     <div className="card scroll"><table><thead><tr><th>{who} (legal name / brand)</th><th>Contact</th><th className="n">Invoices</th><th className="n">TDS ₹</th><th className="n">Overdue ₹</th><th className="n">Pending ₹</th></tr></thead><tbody>
-      {G.map((g) => { const isOpen = open[g.party_id]; const poc = (g.contacts || [])[0]; return [
+      {pg.view.map((g) => { const isOpen = open[g.party_id]; const poc = (g.contacts || [])[0]; return [
         <tr key={g.party_id} className="click" onClick={() => setOpen({ ...open, [g.party_id]: !isOpen })}>
           <td><b>{isOpen ? '▾' : '▸'} {g.name}</b>{g.brand_name && <span className="fx">{g.brand_name}</span>}</td>
           <td>{poc ? <>{poc.name}<span className="fx">{[poc.phone, poc.email].filter(Boolean).join(' · ')}</span></> : <span className="note">—</span>}</td>
@@ -50,7 +51,7 @@ function Pending() {
               <td className="n"><b>{i.currency === 'INR' ? inr2(i.due) : `${i.currency} ${inr2(i.due)}`}</b>{i.currency !== 'INR' && <span className="fx">≈ {inr(i.due_inr)}</span>}</td><td><StageBadge s={i.stage} status="approved" /></td></tr>)}
           </tbody></table></td></tr>]; })}
       {data && !G.length && <tr><td colSpan="6" className="note">Nothing pending for these filters.</td></tr>}
-    </tbody></table></div>
+    </tbody></table><Pager p={pg} /></div>
     <p className="note">Click a name to see its invoices. Totals are in INR; foreign-currency invoices also show the original amount.</p>
   </>;
 }
@@ -58,7 +59,7 @@ function Pending() {
 function Items() {
   const [fy, setFy] = useState(fyOf()); const [dir, setDir] = useState('sales'); const [s, setS] = useState(''); const [open, setOpen] = useState({}); const r = fyRange(fy);
   const qs = new URLSearchParams(Object.entries({ direction: dir, from: r.from, to: r.to, q: s }).filter(([, v]) => v)).toString();
-  const { data, error } = useApi('/reports/items?' + qs); const R = data?.rows || [];
+  const { data, error } = useApi('/reports/items?' + qs); const R = data?.rows || []; const pg = usePaged(R, qs);
   const exportCsv = () => download(`items-${dir}-${r.label}.csv`, csv([['Item (head)', 'Invoice', 'Date', 'Party', 'More lines', 'Amount', 'Currency'], ...R.flatMap((x) => x.entries.map((e) => [x.head, e.invoice_no, e.date, e.party, String(e.details || '').replace(/\n/g, ' | '), e.amount, e.currency]))]));
   return <>
     <div className="filters"><Seg value={dir} onChange={setDir} options={[['sales', 'Sales'], ['purchase', 'Purchase']]} /><FySelect value={fy} onChange={setFy} />
@@ -67,11 +68,11 @@ function Items() {
     {error && <div className="err-box">{error}</div>}
     {data && <div className="kpis"><div className="kpi"><div className="l">Total ({r.label})</div><div className="v">{lakh(data.total_inr)}</div><div className="d">{R.length} item heads · approved tax invoices only</div></div></div>}
     <div className="card scroll"><table><thead><tr><th>Item (first line of description)</th><th className="n">Invoices</th><th className="n">Qty</th><th className="n">Amount ₹</th></tr></thead><tbody>
-      {R.map((x) => [<tr key={x.head} className="click" onClick={() => setOpen({ ...open, [x.head]: !open[x.head] })}><td><b>{open[x.head] ? '▾' : '▸'} {x.head}</b></td><td className="n">{x.invoices}</td><td className="n">{num(x.qty)}</td><td className="n"><b>{inr2(x.amount_inr)}</b></td></tr>,
+      {pg.view.map((x) => [<tr key={x.head} className="click" onClick={() => setOpen({ ...open, [x.head]: !open[x.head] })}><td><b>{open[x.head] ? '▾' : '▸'} {x.head}</b></td><td className="n">{x.invoices}</td><td className="n">{num(x.qty)}</td><td className="n"><b>{inr2(x.amount_inr)}</b></td></tr>,
         open[x.head] && <tr key={x.head + 'd'}><td colSpan="4" style={{ background: 'var(--bg)' }}><table><tbody>
           {x.entries.map((e, i) => <tr key={i}><td className="mono"><Link href={'/invoice/' + e.invoice_id} style={{ textDecoration: 'underline' }}>{e.invoice_no}</Link><span className="fx">{fdate(e.date)}</span></td><td>{e.party}</td><td style={{ whiteSpace: 'pre-line' }}>{e.details}</td><td className="n">{e.currency} {inr2(e.amount)}</td></tr>)}</tbody></table></td></tr>])}
       {data && !R.length && <tr><td colSpan="4" className="note">No items for these filters. Items appear once tax invoices are approved.</td></tr>}
-    </tbody></table></div>
+    </tbody></table><Pager p={pg} /></div>
     <p className="note">Items are grouped by the first line of the description, so a head like "Social Media Marketing Services Local" adds up across every invoice.</p>
   </>;
 }

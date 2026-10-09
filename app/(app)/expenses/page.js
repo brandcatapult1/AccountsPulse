@@ -1,4 +1,5 @@
 'use client';
+import { usePaged, Pager } from '@/components/Pager';
 import { useState } from 'react';
 import { api, useApi, useSeller, inr2, lakh, fdate, coLabel } from '@/lib/client';
 import { OwnerSelect, Seg } from '@/components/Filters';
@@ -33,7 +34,7 @@ export default function Expenses() {
     try { const fd = new FormData(); for (const [k, v] of Object.entries(form)) if (v !== null && v !== '') fd.append(k, v); await api('/vouchers', { method: 'POST', body: fd }); setMsg(form.kind === 'petty_in' ? 'Petty cash recorded.' : 'Expense recorded.'); setForm(null); reload(); }
     catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
-  const E = data?.entries || [];
+  const E = data?.entries || []; const pg = usePaged(E, qs);
   const exportCsv = () => { const url = URL.createObjectURL(new Blob([csv([['Date', 'Type', 'Category', 'Description', 'Paid from / received', 'Reference', 'Added by', 'Money in', 'Money out'], ...E.map((v) => [v.voucher_date, v.kind === 'petty_in' ? 'Petty cash received' : 'Expense', v.category, v.description || v.from_name, v.source, v.reference, v.by_name, v.kind === 'petty_in' ? v.amount : '', v.kind === 'expense' ? v.amount : ''])])], { type: 'text/csv' })); const a = document.createElement('a'); a.href = url; a.download = `expenses-${from}-to-${to}.csv`; a.click(); URL.revokeObjectURL(url); };
   return <>
     <div className="bar"><h2>Expenses & petty cash</h2>
@@ -94,7 +95,7 @@ export default function Expenses() {
     </div>
     <div className="card scroll"><h3>Voucher entries</h3><table><thead><tr><th>Date</th><th>Entry</th><th>Paid from / received</th><th>Added by</th><th className="n">In ₹</th><th className="n">Out ₹</th><th className="n">Petty balance ₹</th><th /></tr></thead><tbody>
       {data && <tr><td /><td><i>Opening balance</i></td><td /><td /><td /><td /><td className="n">{inr2(data.opening)}</td><td /></tr>}
-      {E.map((v) => <tr key={v.id}>
+      {pg.view.map((v) => <tr key={v.id}>
         <td className="mono">{fdate(v.voucher_date)}</td>
         <td>{v.kind === 'petty_in' ? <b>Petty cash from {v.from_name || 'Owner'}</b> : <><b>{v.category}</b><span className="fx" style={{ color: 'var(--ink)' }}>{v.description}{v.vendor_name ? ` · ${v.vendor_name}` : ''}{v.reference ? ` · ${v.reference}` : ''}</span></>}
           {v.file_path && <a className="fx" href={`/api/vouchers/${v.id}/file`} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>View bill</a>}</td>
@@ -103,7 +104,7 @@ export default function Expenses() {
         <td className="n">{v.kind === 'petty_in' || v.source === 'Petty cash' ? inr2(v.balance) : <span className="note">not petty cash</span>}</td>
         <td><button className="btn dng" onClick={async () => { if (sure !== v.id) return setSure(v.id); try { await api('/vouchers/' + v.id, { method: 'DELETE' }); setSure(null); setMsg('Entry deleted.'); reload(); } catch (x) { setErr(x.message); } }}>{sure === v.id ? 'Confirm' : 'Delete'}</button></td></tr>)}
       {data && !E.length && <tr><td colSpan="8" className="note">No entries yet. Add an expense or record petty cash received from the owner.</td></tr>}
-    </tbody></table></div>
+    </tbody></table><Pager p={pg} /></div>
     <p className="note">Each entry is saved to the ledger and the profit & loss. You see your own entries; an Account Lead sees the team's, and Super Admin sees everything.</p>
   </>;
 }

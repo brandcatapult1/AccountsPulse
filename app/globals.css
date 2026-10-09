@@ -104,3 +104,4 @@ svg text{fill:var(--muted);font:500 10px var(--f-mono)}
 .poc{display:grid;grid-template-columns:1.2fr 1fr 1.4fr auto;gap:6px;align-items:center}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px}.checks label{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600}
 @media (max-width:560px){.poc{grid-template-columns:1fr 1fr}}
+.pager{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding-top:12px}

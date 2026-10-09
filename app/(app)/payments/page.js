@@ -1,4 +1,5 @@
 'use client';
+import { usePaged, Pager } from '@/components/Pager';
 import { useState } from 'react';
 import Link from 'next/link';
 import { api, useApi, inr2, lakh, fdate, fyOf, fyRange, coLabel, TypeBadge } from '@/lib/client';
@@ -17,7 +18,7 @@ export default function Payments() {
   const [pick, setPick] = useState(null); const [open, setOpen] = useState(false); const [msg, setMsg] = useState('');
   const { data: pending } = useApi(open ? `/invoices?status=approved&direction=${direction}` : '/me');
   const list = open ? (pending || []).filter((i) => i.stage !== 'received') : [];
-  const rows = data?.rows || [];
+  const rows = data?.rows || []; const pg = usePaged(rows, qs);
   const word = tab === 'purchase' ? 'Paid' : 'Received';
   const exportCsv = () => download(`${tab === 'purchase' ? 'vendor-payments' : 'receipts'}-${r.label}.csv`, csv([['Date', tab === 'purchase' ? 'Vendor' : 'Client', 'Brand', 'Invoice', 'Mode', 'Account', 'Amount (INR)', 'TDS', 'Details', 'Recorded by'], ...rows.map((x) => [x.paid_on, x.party_name, x.party_brand, x.invoice_no, x.mode, x.account, x.amount_inr, x.tds, Object.values(x.details || {}).filter(Boolean).join(' / '), x.by_name])]));
   return <>
@@ -40,12 +41,12 @@ export default function Payments() {
       {data && <div className="kpis"><div className="kpi"><div className="l">{word} in {r.label}</div><div className="v">{lakh(data.total)}</div><div className="d">{rows.length} payments{data.tds > 0 ? ` · TDS ${lakh(data.tds)}` : ''}</div></div>
         {Object.entries(data.by_mode).map(([m, v]) => <div className="kpi" key={m}><div className="l">{m}</div><div className="v">{lakh(v)}</div></div>)}</div>}
       <div className="card scroll"><table><thead><tr><th>Date</th><th>{tab === 'purchase' ? 'Vendor' : 'Client'}</th><th>Invoice</th><th>Mode / account</th><th>Details</th><th className="n">Amount ₹</th><th className="n">TDS ₹</th><th>By</th></tr></thead><tbody>
-        {rows.map((x) => <tr key={x.id}><td className="mono">{fdate(x.paid_on)}</td><td><b>{x.party_name}</b>{x.party_brand && <span className="fx">{x.party_brand}</span>}</td>
+        {pg.view.map((x) => <tr key={x.id}><td className="mono">{fdate(x.paid_on)}</td><td><b>{x.party_name}</b>{x.party_brand && <span className="fx">{x.party_brand}</span>}</td>
           <td className="mono"><Link href={'/invoice/' + x.invoice_id} style={{ textDecoration: 'underline' }}>{x.invoice_no}</Link> <TypeBadge t={x.doc_type} /></td>
           <td>{x.mode}<span className="fx">{x.mode === 'Bank account' ? x.account : ''}</span></td>
           <td className="note">{Object.entries(x.details || {}).filter(([k, v]) => v && k !== 'account').map(([, v]) => v).join(' · ')}</td>
           <td className="n"><b>{inr2(x.amount_inr)}</b></td><td className="n">{Number(x.tds) > 0 ? inr2(x.tds) : ''}</td><td>{x.by_name}</td></tr>)}
-        {data && !rows.length && <tr><td colSpan="8" className="note">Nothing recorded in {r.label}.</td></tr>}</tbody></table></div></>}
+        {data && !rows.length && <tr><td colSpan="8" className="note">Nothing recorded in {r.label}.</td></tr>}</tbody></table><Pager p={pg} /></div></>}
 
     {tab === 'summary' && data && <>
       <p className="note">Money in and out of every account in {r.label}: client receipts, vendor payments, petty cash and expenses. Use it to match against your bank statement.</p>

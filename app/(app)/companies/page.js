@@ -1,4 +1,5 @@
 'use client';
+import { usePaged, Pager } from '@/components/Pager';
 import { useState } from 'react';
 import { api, useApi, inr } from '@/lib/client';
 
@@ -10,6 +11,7 @@ export default function Companies() {
   const [kind, setKind] = useState(''); const [s, setS] = useState('');
   const { data, reload } = useApi(`/companies?${new URLSearchParams(Object.entries({ kind, q: s }).filter(([, v]) => v))}`);
   const { data: sellers } = useApi('/companies?kind=own&all=1');
+  const pg = usePaged(data, kind + s);
   const [e, setE] = useState(null); const [err, setErr] = useState(''); const [msg, setMsg] = useState('');
   async function save() {
     try { await api(e.id ? '/companies/' + e.id : '/companies', { method: e.id ? 'PUT' : 'POST', body: e }); setMsg(`${KIND[e.kind]} saved.`); setE(null); setErr(''); reload(); }
@@ -30,14 +32,14 @@ export default function Companies() {
     {msg && <div className="ok-box">{msg}</div>}{err && !e && <div className="err-box">{err}</div>}
     <div className="split w">
       <div className="card scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Contacts</th><th>Seller(s)</th><th className="n">Balance</th><th /></tr></thead><tbody>
-        {(data || []).map((c) => <tr key={c.id}>
+        {pg.view.map((c) => <tr key={c.id}>
           <td><b>{c.name}</b>{c.brand_name && <span className="fx">{c.brand_name}</span>}<span className="fx">{c.gstin || c.tax_id || ''}</span>{(c.bank_accounts || []).length > 0 && <span className="fx">{c.bank_accounts.length} bank account{c.bank_accounts.length > 1 ? 's' : ''}: {c.bank_accounts.map((b) => `${b.bank || 'Bank'} ••${String(b.account_no || '').slice(-4)}`).join(', ')}</span>}</td>
           <td><span className={'pill ' + PILL[c.kind]}>{KIND[c.kind]}</span></td>
           <td>{(c.contacts || []).map((p, i) => <span key={i} className="fx" style={{ color: 'var(--ink)' }}>{p.name}{p.phone ? ' · ' + p.phone : ''}{p.email ? ' · ' + p.email : ''}</span>)}</td>
           <td>{c.kind === 'own' ? '—' : (c.sellers || []).map((x) => x.name).join(', ') || <span className="note">none</span>}</td>
           <td className="n">{c.kind === 'own' ? '' : inr(c.balance)}</td>
           <td style={{ whiteSpace: 'nowrap' }}><button className="btn" onClick={() => edit(c)}>Edit</button> <button className="btn dng" onClick={() => del(c)}>Delete</button></td></tr>)}
-        {data && !data.length && <tr><td colSpan="6" className="note">Nothing here yet. Add a client or vendor, or upload an invoice and they are created for you.</td></tr>}</tbody></table></div>
+        {data && !data.length && <tr><td colSpan="6" className="note">Nothing here yet. Add a client or vendor, or upload an invoice and they are created for you.</td></tr>}</tbody></table><Pager p={pg} /></div>
       {e && <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}><b>{e.id ? 'Edit' : 'Add'} {KIND[e.kind].toLowerCase()}</b>
         <div className="fld"><label htmlFor="ck">Type</label><select id="ck" value={e.kind} onChange={S('kind')}><option value="client">Client</option><option value="vendor">Vendor</option><option value="own">Seller (our company)</option></select></div>
         <div className="fld"><label htmlFor="n">Legal name</label><input id="n" value={e.name} onChange={S('name')} /></div>
