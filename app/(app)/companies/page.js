@@ -4,7 +4,7 @@ import { api, useApi, inr } from '@/lib/client';
 
 const KIND = { own: 'Seller', client: 'Client', vendor: 'Vendor' };
 const PILL = { own: 'p-acc', client: 'p-good', vendor: 'p-warn' };
-const blank = (kind) => ({ name: '', brand_name: '', kind, gstin: '', pan: '', tax_id: '', address: '', state: '', currency: 'INR', credit_days: 0, contacts: [{ name: '', phone: '', email: '' }], bank_accounts: [], seller_ids: [] });
+const blank = (kind) => ({ name: '', brand_name: '', kind, gstin: '', pan: '', tax_id: '', address: '', state: '', currency: 'INR', credit_days: 0, opening_balance: 0, contacts: [{ name: '', phone: '', email: '' }], bank_accounts: [], seller_ids: [] });
 
 export default function Companies() {
   const [kind, setKind] = useState(''); const [s, setS] = useState('');
@@ -20,7 +20,7 @@ export default function Companies() {
   const setPoc = (i, k, v) => setE({ ...e, contacts: e.contacts.map((p, j) => (j === i ? { ...p, [k]: v } : p)) });
   const setBank = (i, k, v) => setE({ ...e, bank_accounts: e.bank_accounts.map((b, j) => (j === i ? { ...b, [k]: v } : b)) });
   const toggleSeller = (id) => setE({ ...e, seller_ids: e.seller_ids.includes(id) ? e.seller_ids.filter((x) => x !== id) : [...e.seller_ids, id] });
-  const edit = (c) => { setE({ ...blank(c.kind), ...c, brand_name: c.brand_name || '', gstin: c.gstin || '', pan: c.pan || '', tax_id: c.tax_id || '', address: c.address || '', state: c.state || '', contacts: c.contacts?.length ? c.contacts : [{ name: '', phone: '', email: '' }], bank_accounts: c.bank_accounts || [], seller_ids: (c.sellers || []).map((x) => x.id) }); setErr(''); setMsg(''); };
+  const edit = (c) => { setE({ ...blank(c.kind), ...c, brand_name: c.brand_name || '', opening_balance: Number(c.opening_balance || 0), gstin: c.gstin || '', pan: c.pan || '', tax_id: c.tax_id || '', address: c.address || '', state: c.state || '', contacts: c.contacts?.length ? c.contacts : [{ name: '', phone: '', email: '' }], bank_accounts: c.bank_accounts || [], seller_ids: (c.sellers || []).map((x) => x.id) }); setErr(''); setMsg(''); };
   const add = (k) => { setE({ ...blank(k), seller_ids: k === 'own' ? [] : (sellers || []).length === 1 ? [sellers[0].id] : [] }); setErr(''); setMsg(''); };
   return <>
     <div className="bar"><h2>Companies</h2>
@@ -59,6 +59,8 @@ export default function Companies() {
         {e.kind !== 'own' && <div className="fld"><label>Works with seller(s)</label>
           <div className="checks">{(sellers || []).map((x) => <label key={x.id}><input type="checkbox" checked={e.seller_ids.includes(x.id)} onChange={() => toggleSeller(x.id)} />{x.brand_name || x.name}</label>)}
             {!(sellers || []).length && <span className="note">Add a seller first (our own company).</span>}</div></div>}
+        {e.kind !== 'own' && <div className="fld"><label htmlFor="ob">Opening balance (₹)</label><input id="ob" type="number" min="0" step="0.01" inputMode="decimal" value={e.opening_balance ?? 0} onChange={S('opening_balance')} />
+          <span className="note">{e.kind === 'vendor' ? 'Amount we already owe this vendor before using this system.' : 'Amount this client already owed us before using this system.'} Leave 0 if none.</span></div>}
         <div className="frow"><div className="fld"><label htmlFor="cc">Currency</label><input id="cc" value={e.currency} onChange={S('currency')} /></div><div className="fld"><label htmlFor="cd">Credit days</label><input id="cd" type="number" value={e.credit_days} onChange={S('credit_days')} /></div></div>
         <div className="frow"><div className="fld"><label htmlFor="g">GSTIN</label><input id="g" value={e.gstin} onChange={S('gstin')} /></div><div className="fld"><label htmlFor="pn">PAN</label><input id="pn" value={e.pan} onChange={S('pan')} /></div></div>
         <div className="fld"><label htmlFor="ti">Other tax ID (EIN, VAT…)</label><input id="ti" value={e.tax_id} onChange={S('tax_id')} /></div>

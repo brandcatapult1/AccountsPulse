@@ -139,3 +139,4 @@ CREATE TABLE IF NOT EXISTS vouchers (
 );
 CREATE INDEX IF NOT EXISTS vouchers_date_idx ON vouchers (voucher_date);
 ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS voucher_id INT REFERENCES vouchers(id) ON DELETE CASCADE;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(16,2) NOT NULL DEFAULT 0;

@@ -43,6 +43,7 @@ function Pending() {
           <td className="n">{g.invoices.length}</td><td className="n">{g.tds > 0 ? inr2(g.tds) : '—'}</td><td className="n" style={{ color: g.overdue_inr ? 'var(--bad)' : undefined }}>{g.overdue_inr ? inr2(g.overdue_inr) : '—'}</td><td className="n"><b>{inr2(g.due_inr)}</b></td></tr>,
         isOpen && <tr key={g.party_id + 'd'}><td colSpan="6" style={{ background: 'var(--bg)' }}>
           <table><thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th className="n">Total</th><th className="n">Paid</th><th className="n">TDS</th><th className="n">Pending</th><th>Status</th></tr></thead><tbody>
+            {g.opening > 0 && <tr><td colSpan="6"><i>Opening balance (carried in before this system)</i></td><td className="n"><b>{inr2(g.opening)}</b></td></tr>}
             {g.invoices.map((i) => <tr key={i.id}><td className="mono"><Link href={'/invoice/' + i.id} style={{ textDecoration: 'underline' }}>{i.invoice_no}</Link> <TypeBadge t={i.doc_type} /></td>
               <td className="mono">{fdate(i.invoice_date)}</td><td className="mono">{fdate(i.due_date)} {i.overdue && <span className="pill p-bad">overdue</span>}</td>
               <td className="n">{i.currency === 'INR' ? inr2(i.total) : `${i.currency} ${inr2(i.total)}`}</td><td className="n">{inr2(i.paid)}</td><td className="n">{num(i.tds) > 0 ? <span style={{ color: 'var(--warn)' }}>{inr2(i.tds)}</span> : '—'}</td>

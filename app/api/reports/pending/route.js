@@ -26,6 +26,16 @@ export const GET = route(async ({ req, user }) => {
     g.due_inr += Number(r.due_inr); g.tds += Number(r.tds); if (r.overdue) g.overdue_inr += Number(r.due_inr);
     g.invoices.push({ ...r, contacts: undefined });
   }
+  // opening balances carried in from before this system, as their own line per client / vendor
+  if (docType !== 'proforma' && !stage) {
+    const ob = await q(`SELECT c.id, c.name, c.brand_name, c.gstin, c.contacts, c.opening_balance FROM companies c WHERE NOT c.archived AND c.opening_balance > 0 AND c.kind=$1
+      AND ($2::int IS NULL OR c.id=$2) AND ($3::int IS NULL OR EXISTS (SELECT 1 FROM company_sellers cs WHERE cs.company_id=c.id AND cs.seller_id=$3))`, [direction === 'sales' ? 'client' : 'vendor', co, seller]);
+    for (const c of ob.rows) {
+      let g = by.get(c.id);
+      if (!g) by.set(c.id, (g = { party_id: c.id, name: c.name, brand_name: c.brand_name, gstin: c.gstin, contacts: c.contacts || [], due_inr: 0, overdue_inr: 0, tds: 0, invoices: [] }));
+      g.opening = Number(c.opening_balance); g.due_inr += g.opening;
+    }
+  }
   const groups = [...by.values()].sort((a, b) => b.due_inr - a.due_inr);
-  return { direction, groups, total_inr: groups.reduce((s, g) => s + g.due_inr, 0), overdue_inr: groups.reduce((s, g) => s + g.overdue_inr, 0), tds: groups.reduce((s, g) => s + g.tds, 0), invoice_count: rows.length };
+  return { direction, groups, total_inr: groups.reduce((s, g) => s + g.due_inr, 0), overdue_inr: groups.reduce((s, g) => s + g.overdue_inr, 0), tds: groups.reduce((s, g) => s + g.tds, 0), invoice_count: rows.length, opening_total: groups.reduce((t, g) => t + (g.opening || 0), 0) };
 });
