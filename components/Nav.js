@@ -13,7 +13,7 @@ export default function Nav({ user }) {
       <div className="brand">Accounts Pulse<small>{ROLE[user.role]}</small></div>
       <div className="seller-pick"><label htmlFor="seller">Seller</label>
         <select id="seller" value={seller} onChange={(e) => setSeller(e.target.value)}><option value="">All sellers</option>{(sellers || []).map((c) => <option key={c.id} value={c.id}>{c.brand_name || c.name}</option>)}</select></div>
-      <div className="grp">Work</div>{L('/', 'Dashboard')}{L('/upload', 'Upload')}{L('/review', 'In review')}{L('/invoices', 'Invoices')}{L('/board', 'Payments board')}{L('/followups', 'Follow-ups')}
+      <div className="grp">Work</div>{L('/', 'Dashboard')}{user.role !== 'admin' && L('/upload', 'Upload')}{L('/review', 'In review')}{L('/invoices', 'Invoices')}{L('/board', 'Payments board')}{L('/followups', 'Follow-ups')}
       <div className="grp">Books</div>{L('/ledger', 'Ledger')}{L('/pl', 'Profit & Loss')}{L('/reports', 'Reports')}{L('/tds', 'TDS report')}
       <div className="grp">Setup</div>{L('/companies', 'Companies')}
       {user.role !== 'member' && L('/team', 'Team')}

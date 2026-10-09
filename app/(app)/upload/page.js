@@ -1,10 +1,13 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, useApi, inr2, TypeBadge, getSeller } from '@/lib/client';
 import { Seg } from '@/components/Filters';
 
 export default function Upload() {
+  const router = useRouter(); const { data: me } = useApi('/me');
+  useEffect(() => { if (me?.role === 'admin') router.replace('/'); }, [me, router]);
   const [direction, setDirection] = useState('sales'); const [docType, setDocType] = useState('auto');
   const [rows, setRows] = useState([]); const [over, setOver] = useState(false); const input = useRef();
   async function send(files) {
