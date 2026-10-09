@@ -17,7 +17,9 @@ export default function Payments() {
   const { data, error, reload } = useApi('/payments?' + qs);
   const [pick, setPick] = useState(null); const [open, setOpen] = useState(false); const [msg, setMsg] = useState('');
   const { data: pending } = useApi(open ? `/invoices?status=approved&direction=${direction}` : '/me');
-  const list = open ? (pending || []).filter((i) => i.stage !== 'received') : [];
+  // `pending` briefly holds the previous response (the signed-in user) right after the panel opens, so only trust an array
+  const loaded = open && Array.isArray(pending);
+  const list = loaded ? pending.filter((i) => i.stage !== 'received') : [];
   const rows = data?.rows || []; const pg = usePaged(rows, qs);
   const word = tab === 'purchase' ? 'Paid' : 'Received';
   const exportCsv = () => download(`${tab === 'purchase' ? 'vendor-payments' : 'receipts'}-${r.label}.csv`, csv([['Date', tab === 'purchase' ? 'Vendor' : 'Client', 'Brand', 'Invoice', 'Mode', 'Account', 'Amount (INR)', 'TDS', 'Details', 'Recorded by'], ...rows.map((x) => [x.paid_on, x.party_name, x.party_brand, x.invoice_no, x.mode, x.account, x.amount_inr, x.tds, Object.values(x.details || {}).filter(Boolean).join(' / '), x.by_name])]));
@@ -35,7 +37,8 @@ export default function Payments() {
         <div className="fld"><label htmlFor="inv">Which invoice?</label>
           <select id="inv" value={pick?.id || ''} onChange={(e) => setPick(list.find((i) => i.id === +e.target.value) || null)}><option value="">Choose an invoice…</option>
             {list.map((i) => <option key={i.id} value={i.id}>{i.invoice_no} · {i.party_name}{i.party_brand ? ` (${i.party_brand})` : ''} · due {i.currency} {inr2(i.due)}{i.doc_type === 'proforma' ? ' · proforma' : ''}</option>)}</select>
-          {!list.length && <span className="note">No pending {tab === 'purchase' ? 'vendor' : 'client'} invoices. Approve an invoice first.</span>}</div>
+          {open && !loaded && <span className="note">Loading invoices…</span>}
+          {loaded && !list.length && <span className="note">No pending {tab === 'purchase' ? 'vendor' : 'client'} invoices. Approve an invoice first.</span>}</div>
         {pick && <RecordPayment key={pick.id} inv={pick} title={`${tab === 'purchase' ? 'Pay' : 'Receive'} · ${pick.party_name} · ${pick.invoice_no}`} onClose={() => setPick(null)} onDone={() => { setPick(null); setOpen(false); setMsg('Saved to the ledger.'); reload(); }} />}
       </div>}
       {data && <div className="kpis"><div className="kpi"><div className="l">{word} in {r.label}</div><div className="v">{lakh(data.total)}</div><div className="d">{rows.length} payments{data.tds > 0 ? ` · TDS ${lakh(data.tds)}` : ''}</div></div>
