@@ -1,24 +1,25 @@
 import { route } from '@/lib/api';
 import { q } from '@/lib/db';
 import { visibleIds } from '@/lib/auth';
-import { sellerSql } from '@/lib/invoices';
+import { sellerSql, scopeParam } from '@/lib/invoices';
 
 /** Pending and part-paid invoices grouped by client (sales) or vendor (purchase). */
 export const GET = route(async ({ req, user }) => {
   const u = new URL(req.url).searchParams, ids = await visibleIds(user);
   const direction = u.get('direction') === 'purchase' ? 'purchase' : 'sales';
-  const docType = u.get('doc_type') || null, stage = u.get('stage') || null, seller = u.get('seller_id') || null, co = u.get('company_id') || null;
+  const docType = u.get('doc_type') || null, stage = u.get('stage') || null, seller = u.get('seller_id') || null, scope = scopeParam(u), co = u.get('company_id') || null;
   const { rows } = await q(
     `SELECT i.id, i.invoice_no, i.doc_type, i.invoice_date, i.due_date, i.currency, i.fx_rate, i.total, i.paid, i.stage, i.promised_date,
        GREATEST(i.total - i.paid, 0) AS due, ROUND(GREATEST(i.total - i.paid, 0) * i.fx_rate, 2) AS due_inr, (CURRENT_DATE - i.invoice_date) AS age_days,
        (i.due_date < CURRENT_DATE) AS overdue,
+       (SELECT string_agg(DISTINCT b.name, ', ') FROM company_brands b WHERE b.id=i.brand_id OR b.id IN (SELECT ii.brand_id FROM invoice_items ii WHERE ii.invoice_id=i.id)) AS brand_label,
        (SELECT COALESCE(SUM(p.tds),0) FROM payments p WHERE p.invoice_id=i.id AND NOT p.voided) AS tds, u.name AS created_name,
        c.id AS party_id, c.name AS party_name, c.brand_name, c.gstin, c.contacts
      FROM invoices i JOIN companies c ON c.id = CASE WHEN i.direction='sales' THEN i.to_company_id ELSE i.from_company_id END
      LEFT JOIN users u ON u.id=i.created_by
      WHERE i.status='approved' AND i.direction=$1 AND i.stage <> 'received' AND ($2::text IS NULL OR i.doc_type=$2) AND ($3::text IS NULL OR i.stage=$3)
        AND ($4::int[] IS NULL OR i.created_by = ANY($4)) AND ($5::int IS NULL OR c.id=$5) AND ${sellerSql(6)}
-     ORDER BY c.name, i.invoice_date`, [direction, docType, stage, ids, co, seller]);
+     ORDER BY c.name, i.invoice_date`, [direction, docType, stage, ids, co, scope]);
   const by = new Map();
   for (const r of rows) {
     let g = by.get(r.party_id);
@@ -27,7 +28,7 @@ export const GET = route(async ({ req, user }) => {
     g.invoices.push({ ...r, contacts: undefined });
   }
   // opening balances carried in from before this system, as their own line per client / vendor
-  if (docType !== 'proforma' && !stage) {
+  if (docType !== 'proforma' && !stage && !u.get('brand_id')) {
     const ob = await q(`SELECT c.id, c.name, c.brand_name, c.gstin, c.contacts, c.opening_balance FROM companies c WHERE NOT c.archived AND c.opening_balance > 0 AND c.kind=$1
       AND ($2::int IS NULL OR c.id=$2) AND ($3::int IS NULL OR EXISTS (SELECT 1 FROM company_sellers cs WHERE cs.company_id=c.id AND cs.seller_id=$3))`, [direction === 'sales' ? 'client' : 'vendor', co, seller]);
     for (const c of ob.rows) {

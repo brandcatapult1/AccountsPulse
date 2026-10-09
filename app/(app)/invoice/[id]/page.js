@@ -14,7 +14,7 @@ export default function Invoice() {
   const { id } = useParams(); const router = useRouter();
   const { data: inv, reload } = useApi('/invoices/' + id);
   const { data: companies } = useApi('/companies?all=1'); const { data: me } = useApi('/me');
-  const [editDesc, setEditDesc] = useState(null);
+  const [editDesc, setEditDesc] = useState(null); const [editBrand, setEditBrand] = useState(null);
   const [f, setF] = useState(null); const [msg, setMsg] = useState(null); const [busy, setBusy] = useState(false); const [showPay, setShowPay] = useState(false);
   const [proformas, setProformas] = useState([]); const [confirmDel, setConfirmDel] = useState(false);
   useEffect(() => { if (inv) setF({ ...inv, invoice_date: iso(inv.invoice_date), due_date: iso(inv.due_date), fx_date: iso(inv.fx_date), items: inv.items.map((i) => ({ ...i })) }); }, [inv]);
@@ -22,6 +22,8 @@ export default function Invoice() {
   useEffect(() => { if (f?.doc_type === 'tax' && partyId) api(`/invoices?doc_type=proforma&status=approved&company_id=${partyId}`).then(setProformas).catch(() => {}); else setProformas([]); }, [f?.doc_type, partyId]);
   if (!f) return <p className="note">Loading…</p>;
   const editable = inv.status === 'review';
+  const partyBrands = ((companies || []).find((c) => c.id === partyId)?.brands) || [];
+  const brandName = (id) => partyBrands.find((b) => b.id === id)?.name || '';
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const setItem = (n, k, v) => setF((x) => { const items = x.items.map((it, i) => i === n ? { ...it, [k]: v } : it); const it = items[n]; if (k === 'qty' || k === 'rate') it.amount = Math.round(num(it.qty) * num(it.rate) * 100) / 100; return { ...x, items, subtotal: items.reduce((s, i) => s + num(i.amount), 0) }; });
   const taxSum = num(f.cgst) + num(f.sgst) + num(f.igst);
@@ -41,7 +43,7 @@ export default function Invoice() {
   return <>
     <div className="bar"><h2>{inv.invoice_no || 'New invoice'} <TypeBadge t={inv.doc_type} /> <StageBadge s={inv.stage} status={inv.status} /></h2>
       <div className="filters"><button className="btn" onClick={() => router.back()}>◀ Back</button></div></div>
-    <p className="note">Added by <b>{inv.created_name || '—'}</b> on {fdate(inv.created_at)}
+    <p className="note">{inv.brand_label && <><span className="pill p-acc">{inv.brand_label}</span> </>}Added by <b>{inv.created_name || '—'}</b> on {fdate(inv.created_at)}
       {inv.status === 'review' ? ' · Not reviewed yet' : <> · {inv.status === 'rejected' ? 'Rejected' : 'Reviewed'} by <b>{inv.reviewed_name || '—'}</b>{inv.reviewed_at ? ' on ' + fdate(inv.reviewed_at) : ''}</>}</p>
     {msg?.err && <div className="err-box">{msg.err}</div>}{msg?.ok && <div className="ok-box">{msg.ok}</div>}
     <div className="split">
@@ -63,6 +65,9 @@ export default function Invoice() {
             <F label="From (seller)" id="fc" flags={flags} fields={['fromGstin', 'parties']}><select id="fc" value={f.from_company_id || ''} onChange={(e) => set('from_company_id', +e.target.value || null)}><option value="">Choose…</option>{parties().map((c) => <option key={c.id} value={c.id}>{coLabel(c)}</option>)}</select></F>
             <F label="To (buyer)" id="tc" flags={flags} fields={['toGstin']}><select id="tc" value={f.to_company_id || ''} onChange={(e) => set('to_company_id', +e.target.value || null)}><option value="">Choose…</option>{parties().map((c) => <option key={c.id} value={c.id}>{coLabel(c)}</option>)}</select></F>
           </div>
+          {partyBrands.length > 0 && <div className="fld"><label htmlFor="ib">Brand</label>
+            <select id="ib" value={f.brand_id || ''} onChange={(e) => set('brand_id', +e.target.value || null)}><option value="">{f.items.some((i) => i.brand_id) ? 'Several / not set' : 'Not set'}</option>{partyBrands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+            <span className="note">Matched from the item text when the brand name appears in it. Change it here, or per line below.</span></div>}
           <div className="link" style={{ alignItems: 'flex-end' }}>
             <b style={{ minWidth: '100%' }}>Currency</b>
             <div className="fld" style={{ flex: '1 1 90px' }}><label htmlFor="cur">Currency</label><input id="cur" value={f.currency} onChange={(e) => set('currency', e.target.value.toUpperCase().slice(0, 3))} /></div>
@@ -75,7 +80,8 @@ export default function Invoice() {
           <div className="scroll"><table><thead><tr><th>Description</th><th>HSN/SAC</th><th className="n">Qty</th><th className="n">Rate</th><th className="n">Amount</th><th /></tr></thead><tbody>
             {f.items.map((it, n) => <tr key={n}>
               <td><input className="inp" aria-label="Description head" placeholder="Head (first line)" style={{ fontWeight: 700 }} value={it.description} onChange={(e) => setItem(n, 'description', e.target.value)} />
-                <textarea className="inp" aria-label="Description lines" placeholder="More lines, one per line" rows={Math.max(2, String(it.details || '').split('\n').length)} style={{ marginTop: 4, resize: 'vertical' }} value={it.details || ''} onChange={(e) => setItem(n, 'details', e.target.value)} /></td>
+                <textarea className="inp" aria-label="Description lines" placeholder="More lines, one per line" rows={Math.max(2, String(it.details || '').split('\n').length)} style={{ marginTop: 4, resize: 'vertical' }} value={it.details || ''} onChange={(e) => setItem(n, 'details', e.target.value)} />
+                {partyBrands.length > 0 && <select className="inp" aria-label="Item brand" style={{ marginTop: 4 }} value={it.brand_id || ''} onChange={(e) => setItem(n, 'brand_id', +e.target.value || null)}><option value="">Brand: not set</option>{partyBrands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>}</td>
               <td style={{ width: 90 }}><input className="inp" aria-label="HSN" value={it.hsn || ''} onChange={(e) => setItem(n, 'hsn', e.target.value)} /></td>
               <td style={{ width: 84 }}><input className="inp" aria-label="Qty" type="number" value={it.qty} onChange={(e) => setItem(n, 'qty', e.target.value)} /></td>
               <td style={{ width: 100 }}><input className="inp" aria-label="Rate" type="number" step="0.01" value={it.rate} onChange={(e) => setItem(n, 'rate', e.target.value)} /></td>
@@ -115,12 +121,13 @@ export default function Invoice() {
 
     {!editable && <div className="card scroll"><div className="bar"><h3>Items</h3>
         {['admin', 'lead'].includes(me?.role) && inv.status !== 'rejected' && (editDesc
-          ? <div className="filters"><button className="btn" onClick={() => setEditDesc(null)}>Cancel</button><button className="btn pri" onClick={() => run(async () => { await api(`/invoices/${id}/descriptions`, { method: 'PUT', body: { items: editDesc } }); setEditDesc(null); }, 'Descriptions saved')}>Save wording</button></div>
-          : <button className="btn" onClick={() => setEditDesc(inv.items.map((i) => ({ id: i.id, description: i.description || '', details: i.details || '' })))}>Edit descriptions</button>)}</div>
+          ? <div className="filters"><button className="btn" onClick={() => setEditDesc(null)}>Cancel</button><button className="btn pri" onClick={() => run(async () => { await api(`/invoices/${id}/descriptions`, { method: 'PUT', body: { items: editDesc, brand_id: editBrand } }); setEditDesc(null); }, 'Descriptions saved')}>Save wording</button></div>
+          : <button className="btn" onClick={() => { setEditBrand(inv.brand_id || null); setEditDesc(inv.items.map((i) => ({ id: i.id, description: i.description || '', details: i.details || '', brand_id: i.brand_id || null }))); }}>Edit descriptions</button>)}</div>
       <table><thead><tr><th>Description</th><th>HSN/SAC</th><th className="n">Qty</th><th className="n">Amount</th></tr></thead><tbody>
         {inv.items.map((it, n) => <tr key={it.id}><td>{editDesc ? <>
             <input className="inp" aria-label="Description head" style={{ fontWeight: 700 }} value={editDesc[n].description} onChange={(e) => setEditDesc(editDesc.map((x, i) => i === n ? { ...x, description: e.target.value } : x))} />
-            <textarea className="inp" aria-label="Description lines" rows={Math.max(2, editDesc[n].details.split('\n').length)} style={{ marginTop: 4 }} value={editDesc[n].details} onChange={(e) => setEditDesc(editDesc.map((x, i) => i === n ? { ...x, details: e.target.value } : x))} /></>
+            <textarea className="inp" aria-label="Description lines" rows={Math.max(2, editDesc[n].details.split('\n').length)} style={{ marginTop: 4 }} value={editDesc[n].details} onChange={(e) => setEditDesc(editDesc.map((x, i) => i === n ? { ...x, details: e.target.value } : x))} />
+            {partyBrands.length > 0 && <select className="inp" aria-label="Item brand" style={{ marginTop: 4 }} value={editDesc[n].brand_id || ''} onChange={(e) => setEditDesc(editDesc.map((x, i) => i === n ? { ...x, brand_id: +e.target.value || null } : x))}><option value="">Brand: not set</option>{partyBrands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>}</>
           : <><b>{it.description}</b>{it.details && <div className="note" style={{ whiteSpace: 'pre-line' }}>{it.details}</div>}</>}</td>
           <td className="mono">{it.hsn}</td><td className="n">{num(it.qty)}</td><td className="n">{inr2(it.amount)}</td></tr>)}</tbody></table></div>}
     {!editable && <div className="grid g2">

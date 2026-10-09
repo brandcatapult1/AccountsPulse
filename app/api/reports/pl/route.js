@@ -1,7 +1,7 @@
 import { route } from '@/lib/api';
 import { q } from '@/lib/db';
 import { visibleIds } from '@/lib/auth';
-import { sellerSql } from '@/lib/invoices';
+import { sellerSql, scopeParam } from '@/lib/invoices';
 
 const INCOME = ['Sales income', 'Export income', 'Exchange gain'], EXPENSE = ['Purchases / expenses', 'Exchange loss'];
 
@@ -12,7 +12,7 @@ async function period(ids, from, to, entity, seller) {
      WHERE (l.account = ANY($1) OR l.account LIKE 'Expense:%') AND l.entry_date BETWEEN $2 AND $3
        AND (
          (i.id IS NOT NULL AND ($4::int[] IS NULL OR i.created_by = ANY($4)) AND ($5::int IS NULL OR i.from_company_id=$5 OR i.to_company_id=$5) AND ${sellerSql(6)})
-         OR (v.id IS NOT NULL AND $5::int IS NULL AND ($4::int[] IS NULL OR v.created_by = ANY($4)) AND ($6::int IS NULL OR v.seller_id=$6))
+         OR (v.id IS NOT NULL AND $5::int IS NULL AND NULLIF(split_part($6::text, ':', 2), '') IS NULL AND ($4::int[] IS NULL OR v.created_by = ANY($4)) AND (NULLIF(split_part($6::text, ':', 1), '') IS NULL OR v.seller_id=NULLIF(split_part($6::text, ':', 1), '')::int))
        )
      GROUP BY 1,2 ORDER BY 2`, [[...INCOME, ...EXPENSE], from, to, ids, entity, seller]);
   return rows;
@@ -22,7 +22,7 @@ const sumBy = (rows) => rows.reduce((a, r) => { a[r.account] = (a[r.account] || 
 
 export const GET = route(async ({ req, user }) => {
   const u = new URL(req.url).searchParams, ids = await visibleIds(user), entity = u.get('company_id') || null;
-  const seller = u.get('seller_id') || null;
+  const seller = scopeParam(u);
   const [cur, prev] = await Promise.all([period(ids, u.get('from'), u.get('to'), entity, seller), period(ids, u.get('pfrom'), u.get('pto'), entity, seller)]);
   const a = sumBy(cur), b = sumBy(prev);
   const names = (cur_, prev_, test) => [...new Set([...cur_, ...prev_].map((r) => r.account).filter(test))];

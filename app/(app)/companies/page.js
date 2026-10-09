@@ -5,7 +5,7 @@ import { api, useApi, inr } from '@/lib/client';
 
 const KIND = { own: 'Seller', client: 'Client', vendor: 'Vendor' };
 const PILL = { own: 'p-acc', client: 'p-good', vendor: 'p-warn' };
-const blank = (kind) => ({ name: '', brand_name: '', kind, gstin: '', pan: '', tax_id: '', address: '', state: '', currency: 'INR', credit_days: 0, opening_balance: 0, contacts: [{ name: '', phone: '', email: '' }], bank_accounts: [], seller_ids: [] });
+const blank = (kind) => ({ name: '', brand_name: '', brands: [''], kind, gstin: '', pan: '', tax_id: '', address: '', state: '', currency: 'INR', credit_days: 0, opening_balance: 0, contacts: [{ name: '', phone: '', email: '' }], bank_accounts: [], seller_ids: [] });
 
 export default function Companies() {
   const [kind, setKind] = useState(''); const [s, setS] = useState('');
@@ -22,7 +22,7 @@ export default function Companies() {
   const setPoc = (i, k, v) => setE({ ...e, contacts: e.contacts.map((p, j) => (j === i ? { ...p, [k]: v } : p)) });
   const setBank = (i, k, v) => setE({ ...e, bank_accounts: e.bank_accounts.map((b, j) => (j === i ? { ...b, [k]: v } : b)) });
   const toggleSeller = (id) => setE({ ...e, seller_ids: e.seller_ids.includes(id) ? e.seller_ids.filter((x) => x !== id) : [...e.seller_ids, id] });
-  const edit = (c) => { setE({ ...blank(c.kind), ...c, brand_name: c.brand_name || '', opening_balance: Number(c.opening_balance || 0), gstin: c.gstin || '', pan: c.pan || '', tax_id: c.tax_id || '', address: c.address || '', state: c.state || '', contacts: c.contacts?.length ? c.contacts : [{ name: '', phone: '', email: '' }], bank_accounts: c.bank_accounts || [], seller_ids: (c.sellers || []).map((x) => x.id) }); setErr(''); setMsg(''); };
+  const edit = (c) => { setE({ ...blank(c.kind), ...c, brand_name: c.brand_name || '', brands: (c.brands || []).map((b) => b.name).concat((c.brands || []).length ? [] : ['']), opening_balance: Number(c.opening_balance || 0), gstin: c.gstin || '', pan: c.pan || '', tax_id: c.tax_id || '', address: c.address || '', state: c.state || '', contacts: c.contacts?.length ? c.contacts : [{ name: '', phone: '', email: '' }], bank_accounts: c.bank_accounts || [], seller_ids: (c.sellers || []).map((x) => x.id) }); setErr(''); setMsg(''); };
   const add = (k) => { setE({ ...blank(k), seller_ids: k === 'own' ? [] : (sellers || []).length === 1 ? [sellers[0].id] : [] }); setErr(''); setMsg(''); };
   return <>
     <div className="bar"><h2>Companies</h2>
@@ -43,7 +43,11 @@ export default function Companies() {
       {e && <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}><b>{e.id ? 'Edit' : 'Add'} {KIND[e.kind].toLowerCase()}</b>
         <div className="fld"><label htmlFor="ck">Type</label><select id="ck" value={e.kind} onChange={S('kind')}><option value="client">Client</option><option value="vendor">Vendor</option><option value="own">Seller (our company)</option></select></div>
         <div className="fld"><label htmlFor="n">Legal name</label><input id="n" value={e.name} onChange={S('name')} /></div>
-        <div className="fld"><label htmlFor="bn">Brand name</label><input id="bn" value={e.brand_name} onChange={S('brand_name')} /></div>
+        <div className="lbl">Brands</div>
+        {e.brands.map((b, i) => <div className="poc" key={i} style={{ gridTemplateColumns: '1fr auto' }}>
+          <input className="inp" aria-label={`Brand ${i + 1}`} placeholder="Brand name" value={b} onChange={(x) => setE({ ...e, brands: e.brands.map((y, j) => (j === i ? x.target.value : y)) })} />
+          <button type="button" className="btn dng" aria-label="Remove brand" onClick={() => setE({ ...e, brands: e.brands.filter((_, j) => j !== i) })}>✕</button></div>)}
+        <div><button type="button" className="btn" onClick={() => setE({ ...e, brands: [...e.brands, ''] })}>+ Add brand</button><span className="note" style={{ marginLeft: 8 }}>One company can have several brands. Invoices are matched to a brand automatically.</span></div>
         <div className="lbl">Contact persons (POC)</div>
         {e.contacts.map((p, i) => <div className="poc" key={i}>
           <input className="inp" aria-label="POC name" placeholder="Name" value={p.name} onChange={(x) => setPoc(i, 'name', x.target.value)} />

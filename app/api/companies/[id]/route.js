@@ -1,6 +1,7 @@
 import { route, bad, audit } from '@/lib/api';
 import { tx } from '@/lib/db';
 import { cleanContacts, cleanBanks, saveSellers, openingOf } from '@/lib/companies';
+import { saveBrands } from '@/lib/brands';
 
 export const PUT = route(async ({ req, user, params }) => {
   const b = await req.json(); const id = +params.id;
@@ -11,6 +12,7 @@ export const PUT = route(async ({ req, user, params }) => {
       [b.name.trim(), b.kind || 'client', b.gstin?.trim().toUpperCase() || null, b.pan?.trim().toUpperCase() || null, b.tax_id || null, b.address || null, b.state || null, JSON.stringify(cleanContacts(b.contacts)), (b.currency || 'INR').toUpperCase(), +b.credit_days || 0, b.brand_name?.trim() || null, id, JSON.stringify(cleanBanks(b.bank_accounts)), openingOf(b)]);
     if (!rows[0]) bad('Company not found.', 404);
     await saveSellers(c, id, rows[0].kind, b.seller_ids);
+    await saveBrands(c, id, b.brands ?? (b.brand_name ? [b.brand_name] : []));
     await audit(c, user, 'company.update', 'company', id, { name: b.name });
     return rows[0];
   });

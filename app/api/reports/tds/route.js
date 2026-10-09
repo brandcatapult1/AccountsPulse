@@ -1,12 +1,12 @@
 import { route } from '@/lib/api';
 import { q } from '@/lib/db';
 import { visibleIds } from '@/lib/auth';
-import { sellerSql } from '@/lib/invoices';
+import { sellerSql, scopeParam } from '@/lib/invoices';
 
 /** mode=deducted: every payment where TDS was cut. mode=missing: sales tax invoices that received money but have no TDS recorded. */
 export const GET = route(async ({ req, user }) => {
   const u = new URL(req.url).searchParams, ids = await visibleIds(user);
-  const co = u.get('company_id') || null, seller = u.get('seller_id') || null, from = u.get('from'), to = u.get('to');
+  const co = u.get('company_id') || null, seller = scopeParam(u), from = u.get('from'), to = u.get('to');
   const scope = `($1::int[] IS NULL OR i.created_by = ANY($1)) AND ($2::int IS NULL OR i.from_company_id=$2 OR i.to_company_id=$2) AND ${sellerSql(3)}`;
   if (u.get('mode') === 'missing') {
     const { rows } = await q(

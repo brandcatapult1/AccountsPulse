@@ -1,7 +1,7 @@
 import { route } from '@/lib/api';
 import { q } from '@/lib/db';
 import { visibleIds } from '@/lib/auth';
-import { sellerSql } from '@/lib/invoices';
+import { sellerSql, scopeParam } from '@/lib/invoices';
 
 /** Follow-up log: who chased which client on which invoice. Leads see their team, Super Admin sees everyone, members see their own. */
 export const GET = route(async ({ req, user }) => {
@@ -17,7 +17,7 @@ export const GET = route(async ({ req, user }) => {
      WHERE ($1::int[] IS NULL OR f.by_user = ANY($1)) AND f.created_at::date BETWEEN $2 AND $3
        AND ($4::int IS NULL OR f.by_user=$4) AND ($5::int IS NULL OR c.id=$5) AND ($6::text IS NULL OR f.channel=$6) AND ${sellerSql(7)}
      ORDER BY f.created_at DESC LIMIT 1000`,
-    [ids, u.get('from') || '1900-01-01', u.get('to') || '2999-12-31', u.get('user_id') || null, u.get('company_id') || null, u.get('channel') || null, u.get('seller_id') || null]);
+    [ids, u.get('from') || '1900-01-01', u.get('to') || '2999-12-31', u.get('user_id') || null, u.get('company_id') || null, u.get('channel') || null, scopeParam(u)]);
   const by = new Map();
   for (const r of rows) {
     let g = by.get(r.by_user);

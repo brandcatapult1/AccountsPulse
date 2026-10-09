@@ -4,6 +4,7 @@ import { route, bad, audit } from '@/lib/api';
 import { tx } from '@/lib/db';
 import { extractInvoice } from '@/lib/extract';
 import { linkParty } from '@/lib/invoices';
+import { detectBrands } from '@/lib/brands';
 
 export const runtime = 'nodejs';
 const DIR = () => path.resolve(process.env.UPLOAD_DIR || './storage/invoices');
@@ -49,15 +50,19 @@ export const POST = route(async ({ req, user }) => {
     await fs.mkdir(DIR(), { recursive: true });
     const stored = `${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
     await fs.writeFile(path.join(DIR(), stored), buf);
+    // tag items (and the invoice) with the party's brand when its name appears in the item text
+    const partyId = direction === 'sales' ? toId : fromId;
+    const brands = partyId ? (await c.query('SELECT id, name FROM company_brands WHERE company_id=$1', [partyId])).rows : [];
+    const det = detectBrands(brands, ex.items || []);
     const cur = ex.currency || 'INR';
     const t = ex.taxes || {};
     const { rows } = await c.query(
-      `INSERT INTO invoices (direction,doc_type,status,invoice_no,invoice_date,due_date,from_company_id,to_company_id,currency,fx_rate,subtotal,cgst,sgst,igst,total,total_inr,file_name,file_path,file_mime,extracted,flags,created_by)
-       VALUES ($1,$2,'review',$3,$4,$5,$6,$7,$8,1,$9,$10,$11,$12,$13,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
+      `INSERT INTO invoices (direction,doc_type,status,invoice_no,invoice_date,due_date,from_company_id,to_company_id,currency,fx_rate,subtotal,cgst,sgst,igst,total,total_inr,file_name,file_path,file_mime,extracted,flags,created_by,brand_id)
+       VALUES ($1,$2,'review',$3,$4,$5,$6,$7,$8,1,$9,$10,$11,$12,$13,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id`,
       [direction, docType, ex.invoiceNo || null, ex.invoiceDate || null, ex.dueDate || null, fromId || null, toId || null, cur, ex.subtotal || 0, t.cgst || 0, t.sgst || 0, t.igst || 0, ex.total || 0,
-       file.name, stored, MIME[ext], JSON.stringify({ ...ex, rawText: undefined }), JSON.stringify(ex.flags || []), user.id]);
+       file.name, stored, MIME[ext], JSON.stringify({ ...ex, rawText: undefined }), JSON.stringify(ex.flags || []), user.id, det.invoiceBrand]);
     const id = rows[0].id;
-    for (const [n, it] of (ex.items || []).entries()) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,details,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, n + 1, it.description, it.details || '', it.hsn, it.qty ?? 1, it.rate ?? 0, it.amount ?? 0]);
+    for (const [n, it] of (ex.items || []).entries()) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,details,hsn,qty,rate,amount,brand_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [id, n + 1, it.description, it.details || '', it.hsn, it.qty ?? 1, it.rate ?? 0, it.amount ?? 0, det.items[n]?.brand_id ?? null]);
     await linkParty(c, direction, fromId, toId);
     const ownId = direction === 'sales' ? fromId : toId;
     if (ex.bank?.account_no && direction === 'sales' && ownId) {

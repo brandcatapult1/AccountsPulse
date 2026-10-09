@@ -140,3 +140,16 @@ CREATE TABLE IF NOT EXISTS vouchers (
 CREATE INDEX IF NOT EXISTS vouchers_date_idx ON vouchers (voucher_date);
 ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS voucher_id INT REFERENCES vouchers(id) ON DELETE CASCADE;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(16,2) NOT NULL DEFAULT 0;
+
+-- v4: several brands per company; invoices and items can be tagged with a brand
+CREATE TABLE IF NOT EXISTS company_brands (
+  id SERIAL PRIMARY KEY,
+  company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS company_brands_uq ON company_brands (company_id, lower(name));
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS brand_id INT REFERENCES company_brands(id) ON DELETE SET NULL;
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS brand_id INT REFERENCES company_brands(id) ON DELETE SET NULL;
+INSERT INTO company_brands (company_id, name)
+  SELECT id, trim(brand_name) FROM companies WHERE brand_name IS NOT NULL AND trim(brand_name) <> ''
+  ON CONFLICT DO NOTHING;

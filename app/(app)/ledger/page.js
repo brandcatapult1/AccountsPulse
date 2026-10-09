@@ -54,7 +54,7 @@ function PartyLedger() {
         {pg.view.map((x) => <tr key={x.id}>
           <td className="mono">{fdate(x.invoice_date)}</td>
           <td className="mono"><Link href={'/invoice/' + x.id} style={{ textDecoration: 'underline' }}>{x.invoice_no}</Link>{x.doc_type === 'proforma' && <span className="ty ty-p" style={{ marginLeft: 4 }}>PRO</span>}</td>
-          <td style={{ minWidth: 180 }}><b>{heads(x.items) || '—'}</b></td>
+          <td style={{ minWidth: 180 }}><b>{heads(x.items) || '—'}</b>{x.brand_label && <span className="fx">{x.brand_label}</span>}</td>
           <td style={{ minWidth: 220 }}>{narr(x.items).map((n, i) => <div key={i} className="note" style={{ color: 'var(--ink)' }}>{n.split('\n').join(' · ')}</div>)}
             {(x.receipts || []).map((p, i) => <div key={'r' + i} className="fx">{word} {inr2(p.amount)} on {fdate(p.date)} · {p.mode}{p.details?.reference || p.details?.txn_id || p.details?.cheque_no ? ' · ' + (p.details.reference || p.details.txn_id || p.details.cheque_no) : ''}{Number(p.tds) > 0 ? ` · TDS ${inr2(p.tds)}` : ''}</div>)}</td>
           <td className="n">{inr2(x.taxable)}</td><td className="n" style={{ color: Number(x.tds) > 0 ? 'var(--warn)' : undefined }}>{Number(x.tds) > 0 ? inr2(x.tds) : '—'}</td><td className="n">{inr2(x.gst)}</td>

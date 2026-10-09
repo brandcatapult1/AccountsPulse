@@ -28,16 +28,16 @@ export const PUT = route(async ({ req, user, params }) => {
     if (inv.status !== 'review') bad('Only invoices in review can be edited. Super Admin can reopen an approved one.', 409);
     const fx = b.currency === 'INR' ? 1 : +b.fx_rate;
     if (!(fx > 0)) bad('Enter the exchange rate.');
-    const items = (b.items || []).map((i, n) => ({ sl: n + 1, description: i.description || '', details: i.details || '', hsn: i.hsn || '', qty: +i.qty || 1, rate: r2(i.rate), amount: r2(i.amount) }));
+    const items = (b.items || []).map((i, n) => ({ sl: n + 1, description: i.description || '', details: i.details || '', hsn: i.hsn || '', qty: +i.qty || 1, rate: r2(i.rate), amount: r2(i.amount), brand_id: +i.brand_id || null }));
     const subtotal = r2(b.subtotal ?? items.reduce((s, i) => s + i.amount, 0));
     const total = r2(b.total ?? subtotal + r2(b.cgst) + r2(b.sgst) + r2(b.igst));
     await c.query(
       `UPDATE invoices SET direction=$1,doc_type=$2,invoice_no=$3,invoice_date=$4,due_date=$5,from_company_id=$6,to_company_id=$7,currency=$8,fx_rate=$9,fx_date=$10,
-        subtotal=$11,cgst=$12,sgst=$13,igst=$14,total=$15,total_inr=$16,linked_proforma_id=$17,notes=$18 WHERE id=$19`,
+        subtotal=$11,cgst=$12,sgst=$13,igst=$14,total=$15,total_inr=$16,linked_proforma_id=$17,notes=$18,brand_id=$20 WHERE id=$19`,
       [b.direction, b.doc_type, b.invoice_no?.trim() || null, b.invoice_date || null, b.due_date || null, b.from_company_id || null, b.to_company_id || null, (b.currency || 'INR').toUpperCase(), fx, b.fx_date || null,
-       subtotal, r2(b.cgst), r2(b.sgst), r2(b.igst), total, r2(total * fx), b.linked_proforma_id || null, b.notes || null, id]);
+       subtotal, r2(b.cgst), r2(b.sgst), r2(b.igst), total, r2(total * fx), b.linked_proforma_id || null, b.notes || null, id, +b.brand_id || null]);
     await c.query('DELETE FROM invoice_items WHERE invoice_id=$1', [id]);
-    for (const i of items) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,details,hsn,qty,rate,amount) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, i.sl, i.description, i.details, i.hsn, i.qty, i.rate, i.amount]);
+    for (const i of items) await c.query('INSERT INTO invoice_items (invoice_id,sl,description,details,hsn,qty,rate,amount,brand_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [id, i.sl, i.description, i.details, i.hsn, i.qty, i.rate, i.amount, i.brand_id]);
     await linkParty(c, b.direction, +b.from_company_id || null, +b.to_company_id || null);
     await audit(c, user, 'invoice.edit', 'invoice', id);
     return { ok: true };

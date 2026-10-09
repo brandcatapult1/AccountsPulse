@@ -24,7 +24,7 @@ function Pending() {
   const { data, error } = useApi('/reports/pending?' + qs);
   const G = data?.groups || []; const pg = usePaged(G, qs, 25); const who = dir === 'sales' ? 'Client' : 'Vendor';
   const exportCsv = () => download(`pending-${dir}.csv`, csv([[who, 'Brand', 'Invoice', 'Type', 'Invoice date', 'Due date', 'Currency', 'Total', 'Paid', 'TDS deducted', 'Pending', 'Pending (INR)', 'Status'],
-    ...G.flatMap((g) => g.invoices.map((i) => [g.name, g.brand_name, i.invoice_no, i.doc_type, i.invoice_date, i.due_date, i.currency, i.total, i.paid, i.tds, i.due, i.due_inr, i.stage === 'part' ? 'Part paid' : 'Pending']))]));
+    ...G.flatMap((g) => g.invoices.map((i) => [g.name, i.brand_label || g.brand_name, i.invoice_no, i.doc_type, i.invoice_date, i.due_date, i.currency, i.total, i.paid, i.tds, i.due, i.due_inr, i.stage === 'part' ? 'Part paid' : 'Pending']))]));
   return <>
     <div className="filters"><Seg value={dir} onChange={(v) => { setDir(v); setCo(''); }} options={[['sales', 'Clients (we raised)'], ['purchase', 'Vendors (we received)']]} />
       <Seg value={dt} onChange={setDt} options={[['tax', 'Tax invoices'], ['proforma', 'Proforma'], ['', 'Both']]} />
@@ -45,7 +45,7 @@ function Pending() {
         isOpen && <tr key={g.party_id + 'd'}><td colSpan="6" style={{ background: 'var(--bg)' }}>
           <table><thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th className="n">Total</th><th className="n">Paid</th><th className="n">TDS</th><th className="n">Pending</th><th>Status</th></tr></thead><tbody>
             {g.opening > 0 && <tr><td colSpan="6"><i>Opening balance (carried in before this system)</i></td><td className="n"><b>{inr2(g.opening)}</b></td></tr>}
-            {g.invoices.map((i) => <tr key={i.id}><td className="mono"><Link href={'/invoice/' + i.id} style={{ textDecoration: 'underline' }}>{i.invoice_no}</Link> <TypeBadge t={i.doc_type} /></td>
+            {g.invoices.map((i) => <tr key={i.id}><td className="mono"><Link href={'/invoice/' + i.id} style={{ textDecoration: 'underline' }}>{i.invoice_no}</Link> <TypeBadge t={i.doc_type} />{i.brand_label && <span className="fx">{i.brand_label}</span>}</td>
               <td className="mono">{fdate(i.invoice_date)}</td><td className="mono">{fdate(i.due_date)} {i.overdue && <span className="pill p-bad">overdue</span>}</td>
               <td className="n">{i.currency === 'INR' ? inr2(i.total) : `${i.currency} ${inr2(i.total)}`}</td><td className="n">{inr2(i.paid)}</td><td className="n">{num(i.tds) > 0 ? <span style={{ color: 'var(--warn)' }}>{inr2(i.tds)}</span> : '—'}</td>
               <td className="n"><b>{i.currency === 'INR' ? inr2(i.due) : `${i.currency} ${inr2(i.due)}`}</b>{i.currency !== 'INR' && <span className="fx">≈ {inr(i.due_inr)}</span>}</td><td><StageBadge s={i.stage} status="approved" /></td></tr>)}

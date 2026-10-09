@@ -39,7 +39,7 @@ export default function Board() {
       return <div key={c} className={'col' + (over === c ? ' over' : '')} onDragOver={(e) => { e.preventDefault(); setOver(c); }} onDragLeave={() => setOver('')} onDrop={(e) => drop(e, c)}>
         <h3><span>{label} <span className="cnt">{cards.length}</span></span></h3><div className="tot">{lakh(tot)}</div>
         {cards.map((i) => <div key={i.id} className="cardi" draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', String(i.id))}>
-          <div className="t"><Link href={'/invoice/' + i.id}><b>{i.party_name}</b>{i.party_brand && <span className="fx">{i.party_brand}</span>}</Link><TypeBadge t={i.doc_type} /></div>
+          <div className="t"><Link href={'/invoice/' + i.id}><b>{i.party_name}</b>{(i.brand_label || i.party_brand) && <span className="fx">{i.brand_label || i.party_brand}</span>}</Link><TypeBadge t={i.doc_type} /></div>
           <div className="t"><span className="mono note">{i.invoice_no}{c !== 'received' && ` · ${i.age_days} d`}</span><span className="amt">₹ {inr2(c === 'received' ? i.total_inr : i.due_inr)}</span></div>
           {i.currency !== 'INR' && <span className="fx">{i.currency} {inr2(c === 'received' ? i.total : i.due)}</span>}
           {i.promised_date && c === 'promised' && <span className="note">Promised {fdate(i.promised_date)}</span>}

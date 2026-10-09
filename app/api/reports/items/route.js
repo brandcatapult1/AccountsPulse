@@ -1,7 +1,7 @@
 import { route } from '@/lib/api';
 import { q } from '@/lib/db';
 import { visibleIds } from '@/lib/auth';
-import { sellerSql } from '@/lib/invoices';
+import { sellerSql, scopeParam } from '@/lib/invoices';
 
 /** Line items on approved tax invoices, grouped by the first line of the description (the head). */
 export const GET = route(async ({ req, user }) => {
@@ -15,7 +15,7 @@ export const GET = route(async ({ req, user }) => {
      FROM invoice_items it JOIN invoices i ON i.id=it.invoice_id LEFT JOIN companies fc ON fc.id=i.from_company_id LEFT JOIN companies tc ON tc.id=i.to_company_id
      WHERE i.status='approved' AND i.doc_type='tax' AND i.direction=$1 AND i.invoice_date BETWEEN $2 AND $3 AND ($4::int[] IS NULL OR i.created_by = ANY($4)) AND ${sellerSql(5)}
        AND ($6::text IS NULL OR it.description ILIKE '%'||$6||'%' OR it.details ILIKE '%'||$6||'%')
-       AND ($7::int IS NULL OR i.from_company_id=$7 OR i.to_company_id=$7)
-     GROUP BY 1 ORDER BY amount_inr DESC`, [direction, u.get('from'), u.get('to'), ids, u.get('seller_id') || null, u.get('q') || null, u.get('company_id') || null]);
+       AND ($7::int IS NULL OR i.from_company_id=$7 OR i.to_company_id=$7) AND ($8::int IS NULL OR it.brand_id=$8)
+     GROUP BY 1 ORDER BY amount_inr DESC`, [direction, u.get('from'), u.get('to'), ids, scopeParam(u), u.get('q') || null, u.get('company_id') || null, u.get('brand_id') || null]);
   return { direction, rows, total_inr: rows.reduce((s, r) => s + Number(r.amount_inr), 0) };
 });

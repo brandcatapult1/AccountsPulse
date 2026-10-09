@@ -1,15 +1,15 @@
 import { route } from '@/lib/api';
 import { q } from '@/lib/db';
 import { visibleIds } from '@/lib/auth';
-import { sellerSql } from '@/lib/invoices';
+import { sellerSql, scopeParam } from '@/lib/invoices';
 
 export const GET = route(async ({ req, user }) => {
   const u = new URL(req.url).searchParams;
   const from = u.get('from'), to = u.get('to'), ids = await visibleIds(user), co = u.get('company_id') || null;
   const owner = u.get('owner') === 'me' ? user.id : u.get('owner') || null;
   const W = `i.status='approved' AND ($1::int[] IS NULL OR i.created_by = ANY($1)) AND i.invoice_date BETWEEN $2 AND $3 AND ($4::int IS NULL OR i.from_company_id=$4 OR i.to_company_id=$4) AND ($5::int IS NULL OR i.created_by=$5) AND ${sellerSql(6)}`;
-  const seller = u.get('seller_id') || null;
-  const P = [ids, from, to, co, owner, seller];
+  const seller = u.get('seller_id') || null, scope = scopeParam(u), brandOn = !!u.get('brand_id');
+  const P = [ids, from, to, co, owner, scope];
   const [k, sales, collected, months, ageing, fx, top, queue] = await Promise.all([
     q(`SELECT
         COALESCE(SUM(total_inr) FILTER (WHERE doc_type='tax' AND direction='sales'),0) AS billed,
@@ -22,7 +22,7 @@ export const GET = route(async ({ req, user }) => {
         COALESCE(SUM(ROUND(GREATEST(total-paid,0)*fx_rate,2)) FILTER (WHERE doc_type='tax' AND direction='purchase' AND stage<>'received'),0) AS payable
        FROM invoices i WHERE ${W}`, P),
     q(`SELECT COALESCE(SUM(l.credit),0) AS income FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id WHERE l.account IN ('Sales income','Export income') AND ${W}`, P),
-    q(`SELECT COALESCE(SUM(p.amount_inr + p.tds),0) AS c, COALESCE(SUM(p.tds),0) AS tds FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE NOT p.voided AND i.direction='sales' AND i.status IN ('approved','converted') AND ($1::int[] IS NULL OR i.created_by = ANY($1)) AND p.paid_on BETWEEN $2 AND $3 AND ($4::int IS NULL OR i.from_company_id=$4 OR i.to_company_id=$4) AND ${sellerSql(5)}`, [ids, from, to, co, seller]),
+    q(`SELECT COALESCE(SUM(p.amount_inr + p.tds),0) AS c, COALESCE(SUM(p.tds),0) AS tds FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE NOT p.voided AND i.direction='sales' AND i.status IN ('approved','converted') AND ($1::int[] IS NULL OR i.created_by = ANY($1)) AND p.paid_on BETWEEN $2 AND $3 AND ($4::int IS NULL OR i.from_company_id=$4 OR i.to_company_id=$4) AND ${sellerSql(5)}`, [ids, from, to, co, scope]),
     q(`SELECT to_char(date_trunc('month', i.invoice_date),'YYYY-MM') AS m,
         COALESCE(SUM(total_inr) FILTER (WHERE doc_type='tax' AND direction='sales'),0) AS billed,
         COALESCE(SUM(total_inr) FILTER (WHERE doc_type='proforma' AND direction='sales'),0) AS proforma,
@@ -33,10 +33,10 @@ export const GET = route(async ({ req, user }) => {
     q(`SELECT currency, SUM(GREATEST(total-paid,0)) AS orig, SUM(ROUND(GREATEST(total-paid,0)*fx_rate,2)) AS inr FROM invoices i WHERE ${W} AND currency<>'INR' AND stage<>'received' GROUP BY currency`, P),
     q(`SELECT c.name, COUNT(*)::int AS n, SUM(ROUND(GREATEST(total-paid,0)*fx_rate,2)) AS due, MIN(i.due_date) AS oldest_due FROM invoices i JOIN companies c ON c.id = CASE WHEN i.direction='sales' THEN i.to_company_id ELSE i.from_company_id END
         WHERE ${W} AND i.stage<>'received' AND i.direction='sales' GROUP BY c.name ORDER BY due DESC LIMIT 5`, P),
-    q(`SELECT i.id,i.invoice_no,i.doc_type,u.name AS created_name,fc.name AS from_name,tc.name AS to_name,i.flags FROM invoices i LEFT JOIN users u ON u.id=i.created_by LEFT JOIN companies fc ON fc.id=i.from_company_id LEFT JOIN companies tc ON tc.id=i.to_company_id WHERE i.status='review' AND ($1::int[] IS NULL OR i.created_by = ANY($1)) AND ${sellerSql(2)} ORDER BY i.created_at DESC LIMIT 8`, [ids, seller]),
+    q(`SELECT i.id,i.invoice_no,i.doc_type,u.name AS created_name,fc.name AS from_name,tc.name AS to_name,i.flags FROM invoices i LEFT JOIN users u ON u.id=i.created_by LEFT JOIN companies fc ON fc.id=i.from_company_id LEFT JOIN companies tc ON tc.id=i.to_company_id WHERE i.status='review' AND ($1::int[] IS NULL OR i.created_by = ANY($1)) AND ${sellerSql(2)} ORDER BY i.created_at DESC LIMIT 8`, [ids, scope]),
   ]);
   const exp = await q(`SELECT COALESCE(SUM(l.debit),0) AS e FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id WHERE l.account IN ('Purchases / expenses','Exchange loss') AND ${W}`, P);
-  const vexp = await q(`SELECT COALESCE(SUM(l.debit),0) AS e FROM ledger_entries l JOIN vouchers v ON v.id=l.voucher_id WHERE l.account LIKE 'Expense:%' AND l.entry_date BETWEEN $2 AND $3 AND ($1::int[] IS NULL OR v.created_by = ANY($1)) AND ($4::int IS NULL OR v.seller_id=$4) AND $5::int IS NULL`, [ids, from, to, seller, co]);
+  const vexp = await q(`SELECT COALESCE(SUM(l.debit),0) AS e FROM ledger_entries l JOIN vouchers v ON v.id=l.voucher_id WHERE l.account LIKE 'Expense:%' AND l.entry_date BETWEEN $2 AND $3 AND ($1::int[] IS NULL OR v.created_by = ANY($1)) AND ($4::int IS NULL OR v.seller_id=$4) AND $5::int IS NULL AND ${brandOn ? 'false' : 'true'}`, [ids, from, to, seller, co]);
   const gain = await q(`SELECT COALESCE(SUM(l.credit),0) AS g FROM ledger_entries l JOIN invoices i ON i.id=l.invoice_id WHERE l.account='Exchange gain' AND ${W}`, P);
   const income = Number(sales.rows[0].income) + Number(gain.rows[0].g);
   return { kpis: { ...k.rows[0], collected: collected.rows[0].c, tds: collected.rows[0].tds, income, expenses: Number(exp.rows[0].e) + Number(vexp.rows[0].e), profit: income - Number(exp.rows[0].e) - Number(vexp.rows[0].e) },
